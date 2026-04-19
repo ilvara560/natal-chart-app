@@ -130,7 +130,6 @@ class NatalChart:
             6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
         }
         
-        # --- 縦方向に年が流れるように修正（Web表示と統一） ---
         lines.append(" [ Year Cycle Table ]")
         lines.append("  Age | Year | Cyc Theme    || Age | Year | Cyc Theme    || Age | Year | Cyc Theme")
         lines.append("  " + "-" * 81)
@@ -152,16 +151,23 @@ class NatalChart:
         if not HAS_FPDF: return None
         pdf = FPDF()
         pdf.add_page()
+        
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 16)
         pdf.cell(0, 10, "NATAL CHART ANALYSIS REPORT", ln=True, align="C")
+        pdf.set_text_color(0, 0, 0)
+        
         pdf.set_font("Helvetica", "", 10)
         b_date_str = f"{self.results['BirthYear']}{self.results['BirthMonth']:02}{self.results['BirthDay']:02}"
         pdf.cell(0, 10, f"Name: {self.raw_name.upper()}  |  Birthdate: {b_date_str}", ln=True, align="C")
         pdf.ln(5)
 
-        pdf.set_fill_color(240, 240, 240)
+        # 1. Core Numbers & Themes
+        pdf.set_fill_color(245, 247, 250)
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
         pdf.cell(0, 8, " [ Core Numbers & Themes ]", ln=True, fill=True)
+        pdf.set_text_color(0, 0, 0)
         pdf.set_font("Helvetica", "", 10)
         res = self.results
         
@@ -181,12 +187,39 @@ class NatalChart:
         
         pdf.set_y(y_start + (7 * 5) + 5)
 
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(0, 6, f" [ Turning Point Ages ]  1st: {res['TP'][0]} yrs   |   2nd (Main): {res['TP'][1]} yrs   |   3rd: {res['TP'][2]} yrs", ln=True)
-        pdf.ln(2)
+        # 2. Turning Point Ages (他のセクションと同じフォーマットに修正)
+        pdf.set_fill_color(245, 247, 250)
+        pdf.set_text_color(74, 144, 226)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, " [ Turning Point Ages ]", ln=True, fill=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 9)
 
+        y_start_tp = pdf.get_y()
+        
+        # 1st Turning Point
+        pdf.cell(35, 7, "1st Turning Point", border=1)
+        pdf.cell(15, 7, f"{res['TP'][0]} yrs", border=1, align="C")
+        
+        # 2nd Turning Point
+        pdf.set_xy(10 + 50 + 10, y_start_tp)
+        pdf.cell(45, 7, "2nd Turning Point (Main)", border=1)
+        pdf.cell(15, 7, f"{res['TP'][1]} yrs", border=1, align="C")
+        
+        # 3rd Turning Point
+        pdf.set_xy(10 + 50 + 10 + 60 + 10, y_start_tp)
+        pdf.cell(35, 7, "3rd Turning Point", border=1)
+        pdf.cell(15, 7, f"{res['TP'][2]} yrs", border=1, ln=True, align="C")
+        
+        pdf.ln(5)
+
+        # 3. Life Cycle Stages
+        pdf.set_fill_color(245, 247, 250)
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
         pdf.cell(0, 8, f" [ Life Cycle Stages ]", ln=True, fill=True)
+        pdf.set_text_color(0, 0, 0)
+        
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(30, 7, "Term", 1, 0, "C")
         pdf.cell(40, 7, "Age Range", 1, 0, "C")
@@ -202,39 +235,51 @@ class NatalChart:
             pdf.cell(30, 7, str(s["hard"]), 1, 1, "C")
         
         pdf.ln(5)
+        
+        # 4. Nine Box
+        pdf.set_fill_color(245, 247, 250)
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
         pdf.cell(0, 8, " [ Nine Box (Magic Array) ]", ln=True, fill=True)
+        pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
         
         c = res["Counts"]
         y_start_nb = pdf.get_y()
         
+        pdf.set_text_color(127, 140, 141)
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(15, 6, "[3]", 1, 0, "C")
         pdf.cell(15, 6, "[6]", 1, 0, "C")
         pdf.cell(15, 6, "[9]", 1, 1, "C")
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(15, 6, str(c[3]), 1, 0, "C")
         pdf.cell(15, 6, str(c[6]), 1, 0, "C")
         pdf.cell(15, 6, str(c[9]), 1, 1, "C")
         
+        pdf.set_text_color(127, 140, 141)
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(15, 6, "[2]", 1, 0, "C")
         pdf.cell(15, 6, "[5]", 1, 0, "C")
         pdf.cell(15, 6, "[8]", 1, 1, "C")
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(15, 6, str(c[2]), 1, 0, "C")
         pdf.cell(15, 6, str(c[5]), 1, 0, "C")
         pdf.cell(15, 6, str(c[8]), 1, 1, "C")
         
+        pdf.set_text_color(127, 140, 141)
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(15, 6, "[1]", 1, 0, "C")
         pdf.cell(15, 6, "[4]", 1, 0, "C")
         pdf.cell(15, 6, "[7]", 1, 1, "C")
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(15, 6, str(c[1]), 1, 0, "C")
         pdf.cell(15, 6, str(c[4]), 1, 0, "C")
         pdf.cell(15, 6, str(c[7]), 1, 1, "C")
+        pdf.set_text_color(0, 0, 0)
 
         pdf.set_xy(70, y_start_nb)
         pdf.set_font("Helvetica", "B", 9)
@@ -254,31 +299,42 @@ class NatalChart:
             pdf.cell(30, 5, s_name, 1, 0, "C")
             pdf.cell(20, 5, str(s_val), 1, 1, "C")
 
+        # 5. Year Cycle Table
         pdf.add_page()
+        pdf.set_fill_color(245, 247, 250)
+        pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        # タイトル変更: Year Cycle Table
         pdf.cell(0, 8, " [ Year Cycle Table ]", ln=True, fill=True)
+        pdf.set_text_color(0, 0, 0)
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
             6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
         }
 
+        def get_cycle_rgb(cycle):
+            mapping = {
+                1: (255, 229, 229), 2: (255, 242, 229), 3: (255, 255, 229),
+                4: (229, 255, 229), 5: (229, 255, 255), 6: (229, 242, 255),
+                7: (229, 229, 255), 8: (242, 229, 255), 9: (255, 229, 242)
+            }
+            return mapping.get(cycle, (255, 255, 255))
+
         table_width = (8 + 12 + 6 + 22) * 3 + 5 * 2
         start_x = (210 - table_width) / 2
 
+        pdf.set_fill_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_x(start_x)
         for _ in range(3):
-            pdf.cell(8, 6, "Age", 1, 0, "C")
-            pdf.cell(12, 6, "Year", 1, 0, "C")
-            pdf.cell(6, 6, "Cy", 1, 0, "C")
-            pdf.cell(22, 6, "Theme", 1, 0, "C")
+            pdf.cell(8, 6, "Age", 1, 0, "C", fill=True)
+            pdf.cell(12, 6, "Year", 1, 0, "C", fill=True)
+            pdf.cell(6, 6, "Cy", 1, 0, "C", fill=True)
+            pdf.cell(22, 6, "Theme", 1, 0, "C", fill=True)
             pdf.cell(5, 6, "", 0, 0)
         pdf.ln()
 
         pdf.set_font("Helvetica", "", 8)
-        # --- 縦方向に年が流れるように修正（Web表示と統一） ---
         for r in range(27):
             pdf.set_x(start_x)
             for c_idx in range(3):
@@ -286,10 +342,14 @@ class NatalChart:
                 y = res["BirthYear"] + age
                 cyc = self._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
                 theme = cycle_keywords.get(cyc, "")
-                pdf.cell(8, 6, str(age), 1, 0, "C")
-                pdf.cell(12, 6, str(y), 1, 0, "C")
-                pdf.cell(6, 6, str(cyc), 1, 0, "C")
-                pdf.cell(22, 6, theme, 1, 0, "C")
+                
+                rgb = get_cycle_rgb(cyc)
+                pdf.set_fill_color(rgb[0], rgb[1], rgb[2])
+                
+                pdf.cell(8, 6, str(age), 1, 0, "C", fill=True)
+                pdf.cell(12, 6, str(y), 1, 0, "C", fill=True)
+                pdf.cell(6, 6, str(cyc), 1, 0, "C", fill=True)
+                pdf.cell(22, 6, theme, 1, 0, "C", fill=True)
                 pdf.cell(5, 6, "", 0, 0)
             pdf.ln()
 
@@ -301,7 +361,6 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
-# CSSによる全体的な装飾
 st.markdown("""
 <style>
 div[data-testid="metric-container"] {
@@ -358,13 +417,9 @@ if submitted:
             res = chart.results
             c = res["Counts"]
             
-            # --- 1. テキストフォーマット ---
             with st.expander("📄 Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
-            # --- 2. グラフィカルUI ---
-            
-            # 2.1 Core Numbers & Themes
             st.markdown('<div class="section-header">🧩 [ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
             
             c1, c2, c3, c4, c5 = st.columns(5)
@@ -382,14 +437,12 @@ if submitted:
             c8.metric("New Strengths", res["Strengths"])
             c9.metric("Sub Theme", res["SubTheme"])
 
-            # 2.3 Turning Point Ages
             st.markdown('<div class="section-header">⏳ [ Turning Point Ages ]</div>', unsafe_allow_html=True)
             c1, c2, c3 = st.columns(3)
             c1.metric("1st Turning Point", f"{res['TP'][0]} yrs")
             c2.metric("2nd Turning Point (Main)", f"{res['TP'][1]} yrs")
             c3.metric("3rd Turning Point", f"{res['TP'][2]} yrs")
 
-            # 2.4 Life Cycle Stages
             st.markdown('<div class="section-header">📅 [ Life Cycle Stages ]</div>', unsafe_allow_html=True)
             df_stages = pd.DataFrame(res["Stages"])
             df_stages.columns = ["Term", "Age Range", "Milestone", "Rout", "Hardships"]
@@ -399,7 +452,6 @@ if submitted:
                 .hide(axis="index")
             st.table(styled_stages)
             
-            # 2.5 Nine Box (Magic Array)
             st.markdown('<div class="section-header">🔮 [ Nine Box (Magic Array) ]</div>', unsafe_allow_html=True)
             
             col_box, col_sums = st.columns([1, 1])
@@ -466,20 +518,23 @@ if submitted:
                 sum_html += "</table>"
                 st.markdown(sum_html, unsafe_allow_html=True)
 
-            # 2.6 Year Cycle Table 
             st.markdown('<div class="section-header">🌊 [ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
-            cycle_data = []
+            
             cycle_keywords = {
                 1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
                 6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
             }
-            for age in range(81):
-                y = res["BirthYear"] + age
-                cyc = chart._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
-                theme = cycle_keywords.get(cyc, "")
-                cycle_data.append({"Age": age, "Year": y, "Cycle": cyc, "Theme": theme})
             
-            df_cycles = pd.DataFrame(cycle_data)
+            col_a, col_b, col_c = st.columns(3)
+            
+            def create_cycle_df(start_age, end_age):
+                data = []
+                for age in range(start_age, end_age):
+                    y = res["BirthYear"] + age
+                    cyc = chart._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
+                    theme = cycle_keywords.get(cyc, "")
+                    data.append({"Age": age, "Year": y, "Cycle": cyc, "Theme": theme})
+                return pd.DataFrame(data)
 
             def color_cycle(val):
                 colors = {
@@ -490,8 +545,6 @@ if submitted:
                 bg_color = colors.get(val, '')
                 return f'background-color: {bg_color}; color: #000000;' if bg_color else ''
 
-            col_a, col_b, col_c = st.columns(3)
-            
             def style_cycles(df):
                 return df.style.map(color_cycle, subset=['Cycle']) \
                                .set_properties(**{'text-align': 'center'}) \
@@ -499,13 +552,12 @@ if submitted:
                                .hide(axis="index")
 
             with col_a:
-                st.table(style_cycles(df_cycles.iloc[0:27]))
+                st.table(style_cycles(create_cycle_df(0, 27)))
             with col_b:
-                st.table(style_cycles(df_cycles.iloc[27:54]))
+                st.table(style_cycles(create_cycle_df(27, 54)))
             with col_c:
-                st.table(style_cycles(df_cycles.iloc[54:81]))
+                st.table(style_cycles(create_cycle_df(54, 81)))
 
-            # --- 3. グラフィカルPDF ---
             st.markdown('<div class="section-header">📥 [ Export Report ]</div>', unsafe_allow_html=True)
             if HAS_FPDF:
                 pdf_filename = f"{name_in.replace(' ', '_')}_Graphical.pdf"
@@ -524,3 +576,4 @@ if submitted:
                 st.warning("PDF export is unavailable. Please install 'fpdf'.")
     else:
         st.error("Error: Birthday must be exactly 8 digits (YYYYMMDD).")
+        
