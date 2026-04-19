@@ -154,19 +154,20 @@ class NatalChart:
         
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 16)
-        pdf.cell(0, 10, "NATAL CHART ANALYSIS REPORT", ln=True, align="C")
+        # fpdf2対応: ln=True -> new_x="LMARGIN", new_y="NEXT"
+        pdf.cell(0, 10, "NATAL CHART ANALYSIS REPORT", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_text_color(0, 0, 0)
         
         pdf.set_font("Helvetica", "", 10)
         b_date_str = f"{self.results['BirthYear']}{self.results['BirthMonth']:02}{self.results['BirthDay']:02}"
-        pdf.cell(0, 10, f"Name: {self.raw_name.upper()}  |  Birthdate: {b_date_str}", ln=True, align="C")
+        pdf.cell(0, 10, f"Name: {self.raw_name.upper()}  |  Birthdate: {b_date_str}", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(5)
 
         # 1. Core Numbers & Themes
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Core Numbers & Themes ]", ln=True, fill=True)
+        pdf.cell(0, 8, " [ Core Numbers & Themes ]", new_x="LMARGIN", new_y="NEXT", fill=True)
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Helvetica", "", 10)
         res = self.results
@@ -176,40 +177,37 @@ class NatalChart:
         
         y_start = pdf.get_y()
         for item in data_left:
-            pdf.cell(50, 7, item[0], border=1)
-            pdf.cell(15, 7, str(item[1]), border=1, ln=True, align="C")
+            pdf.cell(50, 7, item[0], border=1, new_x="RIGHT", new_y="TOP")
+            pdf.cell(15, 7, str(item[1]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         pdf.set_xy(10 + 65 + 10, y_start)
         for item in data_right:
             pdf.set_x(10 + 65 + 10)
-            pdf.cell(50, 7, item[0], border=1)
-            pdf.cell(15, 7, str(item[1]), border=1, ln=True, align="C")
+            pdf.cell(50, 7, item[0], border=1, new_x="RIGHT", new_y="TOP")
+            pdf.cell(15, 7, str(item[1]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         pdf.set_y(y_start + (7 * 5) + 5)
 
-        # 2. Turning Point Ages (他のセクションと同じフォーマットに修正)
+        # 2. Turning Point Ages
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Turning Point Ages ]", ln=True, fill=True)
+        pdf.cell(0, 8, " [ Turning Point Ages ]", new_x="LMARGIN", new_y="NEXT", fill=True)
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Helvetica", "", 9)
 
         y_start_tp = pdf.get_y()
         
-        # 1st Turning Point
-        pdf.cell(35, 7, "1st Turning Point", border=1)
-        pdf.cell(15, 7, f"{res['TP'][0]} yrs", border=1, align="C")
+        pdf.cell(35, 7, "1st Turning Point", border=1, new_x="RIGHT", new_y="TOP")
+        pdf.cell(15, 7, f"{res['TP'][0]} yrs", border=1, new_x="RIGHT", new_y="TOP", align="C")
         
-        # 2nd Turning Point
         pdf.set_xy(10 + 50 + 10, y_start_tp)
-        pdf.cell(45, 7, "2nd Turning Point (Main)", border=1)
-        pdf.cell(15, 7, f"{res['TP'][1]} yrs", border=1, align="C")
+        pdf.cell(45, 7, "2nd Turning Point (Main)", border=1, new_x="RIGHT", new_y="TOP")
+        pdf.cell(15, 7, f"{res['TP'][1]} yrs", border=1, new_x="RIGHT", new_y="TOP", align="C")
         
-        # 3rd Turning Point
         pdf.set_xy(10 + 50 + 10 + 60 + 10, y_start_tp)
-        pdf.cell(35, 7, "3rd Turning Point", border=1)
-        pdf.cell(15, 7, f"{res['TP'][2]} yrs", border=1, ln=True, align="C")
+        pdf.cell(35, 7, "3rd Turning Point", border=1, new_x="RIGHT", new_y="TOP")
+        pdf.cell(15, 7, f"{res['TP'][2]} yrs", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         pdf.ln(5)
 
@@ -217,22 +215,22 @@ class NatalChart:
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, f" [ Life Cycle Stages ]", ln=True, fill=True)
+        pdf.cell(0, 8, f" [ Life Cycle Stages ]", new_x="LMARGIN", new_y="NEXT", fill=True)
         pdf.set_text_color(0, 0, 0)
         
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(30, 7, "Term", 1, 0, "C")
-        pdf.cell(40, 7, "Age Range", 1, 0, "C")
-        pdf.cell(30, 7, "Milestone", 1, 0, "C")
-        pdf.cell(30, 7, "Rout", 1, 0, "C")
-        pdf.cell(30, 7, "Hardships", 1, 1, "C")
+        pdf.cell(30, 7, "Term", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(40, 7, "Age Range", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(30, 7, "Milestone", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(30, 7, "Rout", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(30, 7, "Hardships", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_font("Helvetica", "", 9)
         for s in res["Stages"]:
-            pdf.cell(30, 7, s["term"], 1)
-            pdf.cell(40, 7, s["age"], 1, 0, "C")
-            pdf.cell(30, 7, str(s["pin"]), 1, 0, "C")
-            pdf.cell(30, 7, str(s["root"]), 1, 0, "C")
-            pdf.cell(30, 7, str(s["hard"]), 1, 1, "C")
+            pdf.cell(30, 7, s["term"], border=1, new_x="RIGHT", new_y="TOP")
+            pdf.cell(40, 7, s["age"], border=1, new_x="RIGHT", new_y="TOP", align="C")
+            pdf.cell(30, 7, str(s["pin"]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+            pdf.cell(30, 7, str(s["root"]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+            pdf.cell(30, 7, str(s["hard"]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         pdf.ln(5)
         
@@ -240,7 +238,7 @@ class NatalChart:
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Nine Box (Magic Array) ]", ln=True, fill=True)
+        pdf.cell(0, 8, " [ Nine Box (Magic Array) ]", new_x="LMARGIN", new_y="NEXT", fill=True)
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
         
@@ -249,42 +247,42 @@ class NatalChart:
         
         pdf.set_text_color(127, 140, 141)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(15, 6, "[3]", 1, 0, "C")
-        pdf.cell(15, 6, "[6]", 1, 0, "C")
-        pdf.cell(15, 6, "[9]", 1, 1, "C")
+        pdf.cell(15, 6, "[3]", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, "[6]", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, "[9]", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(15, 6, str(c[3]), 1, 0, "C")
-        pdf.cell(15, 6, str(c[6]), 1, 0, "C")
-        pdf.cell(15, 6, str(c[9]), 1, 1, "C")
+        pdf.cell(15, 6, str(c[3]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, str(c[6]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, str(c[9]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         pdf.set_text_color(127, 140, 141)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(15, 6, "[2]", 1, 0, "C")
-        pdf.cell(15, 6, "[5]", 1, 0, "C")
-        pdf.cell(15, 6, "[8]", 1, 1, "C")
+        pdf.cell(15, 6, "[2]", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, "[5]", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, "[8]", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(15, 6, str(c[2]), 1, 0, "C")
-        pdf.cell(15, 6, str(c[5]), 1, 0, "C")
-        pdf.cell(15, 6, str(c[8]), 1, 1, "C")
+        pdf.cell(15, 6, str(c[2]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, str(c[5]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, str(c[8]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         pdf.set_text_color(127, 140, 141)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(15, 6, "[1]", 1, 0, "C")
-        pdf.cell(15, 6, "[4]", 1, 0, "C")
-        pdf.cell(15, 6, "[7]", 1, 1, "C")
+        pdf.cell(15, 6, "[1]", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, "[4]", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, "[7]", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(15, 6, str(c[1]), 1, 0, "C")
-        pdf.cell(15, 6, str(c[4]), 1, 0, "C")
-        pdf.cell(15, 6, str(c[7]), 1, 1, "C")
+        pdf.cell(15, 6, str(c[1]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, str(c[4]), border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(15, 6, str(c[7]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_text_color(0, 0, 0)
 
         pdf.set_xy(70, y_start_nb)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(30, 6, "Sum Lines", 1, 0, "C")
-        pdf.cell(20, 6, "Sum", 1, 1, "C")
+        pdf.cell(30, 6, "Sum Lines", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.cell(20, 6, "Sum", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         sums = [
             ("3-6-9", c[3]+c[6]+c[9]), ("2-5-8", c[2]+c[5]+c[8]),
@@ -296,15 +294,15 @@ class NatalChart:
         pdf.set_font("Helvetica", "", 9)
         for s_name, s_val in sums:
             pdf.set_x(70)
-            pdf.cell(30, 5, s_name, 1, 0, "C")
-            pdf.cell(20, 5, str(s_val), 1, 1, "C")
+            pdf.cell(30, 5, s_name, border=1, new_x="RIGHT", new_y="TOP", align="C")
+            pdf.cell(20, 5, str(s_val), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
 
         # 5. Year Cycle Table
         pdf.add_page()
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Year Cycle Table ]", ln=True, fill=True)
+        pdf.cell(0, 8, " [ Year Cycle Table ]", new_x="LMARGIN", new_y="NEXT", fill=True)
         pdf.set_text_color(0, 0, 0)
         
         cycle_keywords = {
@@ -327,11 +325,11 @@ class NatalChart:
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_x(start_x)
         for _ in range(3):
-            pdf.cell(8, 6, "Age", 1, 0, "C", fill=True)
-            pdf.cell(12, 6, "Year", 1, 0, "C", fill=True)
-            pdf.cell(6, 6, "Cy", 1, 0, "C", fill=True)
-            pdf.cell(22, 6, "Theme", 1, 0, "C", fill=True)
-            pdf.cell(5, 6, "", 0, 0)
+            pdf.cell(8, 6, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(12, 6, "Year", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(6, 6, "Cy", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(22, 6, "Theme", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
         pdf.ln()
 
         pdf.set_font("Helvetica", "", 8)
@@ -346,11 +344,11 @@ class NatalChart:
                 rgb = get_cycle_rgb(cyc)
                 pdf.set_fill_color(rgb[0], rgb[1], rgb[2])
                 
-                pdf.cell(8, 6, str(age), 1, 0, "C", fill=True)
-                pdf.cell(12, 6, str(y), 1, 0, "C", fill=True)
-                pdf.cell(6, 6, str(cyc), 1, 0, "C", fill=True)
-                pdf.cell(22, 6, theme, 1, 0, "C", fill=True)
-                pdf.cell(5, 6, "", 0, 0)
+                pdf.cell(8, 6, str(age), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                pdf.cell(12, 6, str(y), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                pdf.cell(6, 6, str(cyc), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                pdf.cell(22, 6, theme, border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
 
         pdf.output(filename)
@@ -576,4 +574,3 @@ if submitted:
                 st.warning("PDF export is unavailable. Please install 'fpdf'.")
     else:
         st.error("Error: Birthday must be exactly 8 digits (YYYYMMDD).")
-        
