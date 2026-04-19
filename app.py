@@ -86,7 +86,6 @@ class NatalChart:
         lines.append(f" Name      : {self.raw_name.upper()}")
         lines.append(f" Birthdate : {res['BirthYear']}/{res['BirthMonth']:02}/{res['BirthDay']:02}")
         lines.append("-" * 75)
-        # 統合された Core Numbers & Themes
         lines.append(" [ Core Numbers & Themes ]")
         lines.append(f"  Birth Number       : {res['BirthNum']}")
         lines.append(f"  Destiny Number     : {res['DestinyNum']}")
@@ -130,20 +129,21 @@ class NatalChart:
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
             6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
         }
-        lines.append(" [ Yearly Cycle Table ]")
-        lines.append("  Age | Year | Cycle - Theme      || Age | Year | Cycle - Theme")
-        lines.append("  " + "-" * 67)
-        for i in range(0, 81, 2):
+        
+        # --- 縦方向に年が流れるように修正（Web表示と統一） ---
+        lines.append(" [ Year Cycle Table ]")
+        lines.append("  Age | Year | Cyc Theme    || Age | Year | Cyc Theme    || Age | Year | Cyc Theme")
+        lines.append("  " + "-" * 81)
+        for r in range(27):
             row_str = ""
-            for j in range(2):
-                age = i + j
-                if age > 80: break
+            for c_idx in range(3):
+                age = r + c_idx * 27
                 y = res["BirthYear"] + age
                 cyc = self._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
                 theme = cycle_keywords.get(cyc, "")
-                row_str += f" {age:>2} | {y} |   {cyc} - {theme:<10} "
-                if j < 1 and (age + 1) <= 80:
-                    row_str += "||"
+                row_str += f" {age:>2} | {y} | {cyc} {theme:<10}"
+                if c_idx < 2:
+                    row_str += " ||"
             lines.append(f"  {row_str}")
         lines.append("=" * 75)
         return "\n".join(lines)
@@ -256,7 +256,8 @@ class NatalChart:
 
         pdf.add_page()
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Yearly Cycle Table ]", ln=True, fill=True)
+        # タイトル変更: Year Cycle Table
+        pdf.cell(0, 8, " [ Year Cycle Table ]", ln=True, fill=True)
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
@@ -277,12 +278,11 @@ class NatalChart:
         pdf.ln()
 
         pdf.set_font("Helvetica", "", 8)
-        for i in range(0, 81, 3):
+        # --- 縦方向に年が流れるように修正（Web表示と統一） ---
+        for r in range(27):
             pdf.set_x(start_x)
-            for j in range(3):
-                age = i + j
-                if age > 80:
-                    break
+            for c_idx in range(3):
+                age = r + c_idx * 27
                 y = res["BirthYear"] + age
                 cyc = self._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
                 theme = cycle_keywords.get(cyc, "")
@@ -364,10 +364,9 @@ if submitted:
             
             # --- 2. グラフィカルUI ---
             
-            # 2.1 Core Numbers & Themes (統合セクション)
+            # 2.1 Core Numbers & Themes
             st.markdown('<div class="section-header">🧩 [ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
             
-            # 1段目 (Core Numbers)
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("Birth Number", res["BirthNum"])
             c2.metric("Destiny Number", res["DestinyNum"])
@@ -375,9 +374,8 @@ if submitted:
             c4.metric("Personality Number", res["PersoNum"])
             c5.metric("Realization Number", res["RealizNum"])
             
-            st.write("") # 上下段の間のわずかな余白
+            st.write("") 
             
-            # 2段目 (Themes)
             c6, c7, c8, c9 = st.columns(4)
             c6.metric("Stage Number", res["StageNum"])
             c7.metric("Challenge Number", res["ChallNum"])
@@ -468,8 +466,8 @@ if submitted:
                 sum_html += "</table>"
                 st.markdown(sum_html, unsafe_allow_html=True)
 
-            # 2.6 Yearly Cycle Table 
-            st.markdown('<div class="section-header">🌊 [ Yearly Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
+            # 2.6 Year Cycle Table 
+            st.markdown('<div class="section-header">🌊 [ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
             cycle_data = []
             cycle_keywords = {
                 1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
