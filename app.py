@@ -67,11 +67,25 @@ class NatalChart:
             n = self._get_name_number(c)
             if n > 0: counts[n] += 1
 
+        magic_array = [
+            0 if 0 in (counts[3], counts[6], counts[9]) else counts[3] + counts[6] + counts[9],
+            0 if 0 in (counts[2], counts[5], counts[8]) else counts[2] + counts[5] + counts[8],
+            0 if 0 in (counts[1], counts[4], counts[7]) else counts[1] + counts[4] + counts[7],
+            0 if 0 in (counts[1], counts[2], counts[3]) else counts[1] + counts[2] + counts[3],
+            0 if 0 in (counts[4], counts[5], counts[6]) else counts[4] + counts[5] + counts[6],
+            0 if 0 in (counts[7], counts[8], counts[9]) else counts[7] + counts[8] + counts[9],
+            0 if 0 in (counts[3], counts[5], counts[7]) else counts[3] + counts[5] + counts[7],
+            0 if 0 in (counts[1], counts[5], counts[9]) else counts[1] + counts[5] + counts[9]
+        ]
+        max_nine = max(magic_array)
+        nine_box_sums = [str(v) if v == max_nine else "_" for v in magic_array]
+        
         self.results = {
             "BirthYear": b_year, "BirthMonth": b_month, "BirthDay": b_day,
             "BirthNum": birth_num, "DestinyNum": destiny_num, "SoulNum": soul_num, "PersoNum": perso_num, "RealizNum": realiz_num,
             "StageNum": stage_num, "ChallNum": chall_num, "Strengths": strengths, "SubTheme": sub_theme,
             "TP": [tp1, tp2, tp3], "Counts": counts,
+            "MagicArray": magic_array, "NineBoxSums": nine_box_sums, "NineBoxMax": max_nine,
             "Stages": [
                 {"term": "1st Stage", "age": f"0 ~ {s1_e}", "pin": pin[0], "root": roots[0], "hard": hards[0]},
                 {"term": "2nd Stage", "age": f"{s1_e+1} ~ {s2_e}", "pin": pin[1], "root": roots[1], "hard": hards[1]},
@@ -82,6 +96,7 @@ class NatalChart:
 
     def generate_report_text(self) -> str:
         res, c = self.results, self.results["Counts"]
+        nbs = res["NineBoxSums"]
         lines = ["=" * 75, " " * 24 + "NATAL CHART ANALYSIS REPORT", "=" * 75]
         lines.append(f" Name      : {self.raw_name.upper()}")
         lines.append(f" Birthdate : {res['BirthYear']}/{res['BirthMonth']:02}/{res['BirthDay']:02}")
@@ -108,17 +123,17 @@ class NatalChart:
         for row in res["Stages"]:
             lines.append(f"   {row['term']}    {row['age']:>12}          {row['pin']}          {row['root']}          {row['hard']}")
         lines.append("-" * 75)
-        lines.append(" [ Nine Box (Magic Array) ]")
+        lines.append(" [ Nine Box ]")
         lines.append("  (Character Counts in Name)\n")
         lines.append("       [3] [6] [9]      Sum Lines:")
-        lines.append(f"        {c[3]}   {c[6]}   {c[9]}       3-6-9 : {c[3]+c[6]+c[9]}")
-        lines.append(f"       [2] [5] [8]      2-5-8 : {c[2]+c[5]+c[8]}")
-        lines.append(f"        {c[1]}   {c[4]}   {c[7]}       1-4-7 : {c[1]+c[4]+c[7]}")
-        lines.append(f"       [1] [4] [7]      1-2-3 : {c[1]+c[2]+c[3]}")
-        lines.append(f"        {c[1]}   {c[4]}   {c[7]}       4-5-6 : {c[4]+c[5]+c[6]}")
-        lines.append(f"                        7-8-9 : {c[7]+c[8]+c[9]}")
-        lines.append(f"                        3-5-7 : {c[3]+c[5]+c[7]}")
-        lines.append(f"                        1-5-9 : {c[1]+c[5]+c[9]}")
+        lines.append(f"        {c[3]}   {c[6]}   {c[9]}       3-6-9 : {nbs[0]}")
+        lines.append(f"       [2] [5] [8]      2-5-8 : {nbs[1]}")
+        lines.append(f"        {c[1]}   {c[4]}   {c[7]}       1-4-7 : {nbs[2]}")
+        lines.append(f"       [1] [4] [7]      1-2-3 : {nbs[3]}")
+        lines.append(f"        {c[1]}   {c[4]}   {c[7]}       4-5-6 : {nbs[4]}")
+        lines.append(f"                        7-8-9 : {nbs[5]}")
+        lines.append(f"                        3-5-7 : {nbs[6]}")
+        lines.append(f"                        1-5-9 : {nbs[7]}")
         lines.append("-" * 75)
         lines.append(" [ Cycle 1-9 Status ]")
         lines.append("  1: Beginning   2: Alignment   3: Creation   4: Stability   5: Movement")
@@ -154,7 +169,6 @@ class NatalChart:
         
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 16)
-        # fpdf2対応: ln=True -> new_x="LMARGIN", new_y="NEXT"
         pdf.cell(0, 10, "NATAL CHART ANALYSIS REPORT", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.set_text_color(0, 0, 0)
         
@@ -163,7 +177,6 @@ class NatalChart:
         pdf.cell(0, 10, f"Name: {self.raw_name.upper()}  |  Birthdate: {b_date_str}", new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(5)
 
-        # 1. Core Numbers & Themes
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
@@ -188,7 +201,6 @@ class NatalChart:
         
         pdf.set_y(y_start + (7 * 5) + 5)
 
-        # 2. Turning Point Ages
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
@@ -211,7 +223,6 @@ class NatalChart:
         
         pdf.ln(5)
 
-        # 3. Life Cycle Stages
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
@@ -234,15 +245,15 @@ class NatalChart:
         
         pdf.ln(5)
         
-        # 4. Nine Box
         pdf.set_fill_color(245, 247, 250)
         pdf.set_text_color(74, 144, 226)
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Nine Box (Magic Array) ]", new_x="LMARGIN", new_y="NEXT", fill=True)
+        pdf.cell(0, 8, " [ Nine Box ]", new_x="LMARGIN", new_y="NEXT", fill=True)
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
         
         c = res["Counts"]
+        nbs = res["NineBoxSums"]
         y_start_nb = pdf.get_y()
         
         pdf.set_text_color(127, 140, 141)
@@ -285,10 +296,10 @@ class NatalChart:
         pdf.cell(20, 6, "Sum", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
         sums = [
-            ("3-6-9", c[3]+c[6]+c[9]), ("2-5-8", c[2]+c[5]+c[8]),
-            ("1-4-7", c[1]+c[4]+c[7]), ("1-2-3", c[1]+c[2]+c[3]),
-            ("4-5-6", c[4]+c[5]+c[6]), ("7-8-9", c[7]+c[8]+c[9]),
-            ("3-5-7", c[3]+c[5]+c[7]), ("1-5-9", c[1]+c[5]+c[9])
+            ("3-6-9", nbs[0]), ("2-5-8", nbs[1]),
+            ("1-4-7", nbs[2]), ("1-2-3", nbs[3]),
+            ("4-5-6", nbs[4]), ("7-8-9", nbs[5]),
+            ("3-5-7", nbs[6]), ("1-5-9", nbs[7])
         ]
         
         pdf.set_font("Helvetica", "", 9)
@@ -450,7 +461,7 @@ if submitted:
                 .hide(axis="index")
             st.table(styled_stages)
             
-            st.markdown('<div class="section-header">🔮 [ Nine Box (Magic Array) ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">🔮 [ Nine Box ]</div>', unsafe_allow_html=True)
             
             col_box, col_sums = st.columns([1, 1])
             with col_box:
@@ -494,25 +505,27 @@ if submitted:
                 st.markdown(html_grid, unsafe_allow_html=True)
                 
             with col_sums:
+                ma = res["MagicArray"]
+                nbs = res["NineBoxSums"]
+                max_val = res["NineBoxMax"] if res["NineBoxMax"] > 0 else 1
+                
                 sum_lines_data = [
-                    {"name": "3-6-9", "val": c[3]+c[6]+c[9]},
-                    {"name": "2-5-8", "val": c[2]+c[5]+c[8]},
-                    {"name": "1-4-7", "val": c[1]+c[4]+c[7]},
-                    {"name": "1-2-3", "val": c[1]+c[2]+c[3]},
-                    {"name": "4-5-6", "val": c[4]+c[5]+c[6]},
-                    {"name": "7-8-9", "val": c[7]+c[8]+c[9]},
-                    {"name": "3-5-7", "val": c[3]+c[5]+c[7]},
-                    {"name": "1-5-9", "val": c[1]+c[5]+c[9]}
+                    {"name": "3-6-9", "str": nbs[0], "num": ma[0]},
+                    {"name": "2-5-8", "str": nbs[1], "num": ma[1]},
+                    {"name": "1-4-7", "str": nbs[2], "num": ma[2]},
+                    {"name": "1-2-3", "str": nbs[3], "num": ma[3]},
+                    {"name": "4-5-6", "str": nbs[4], "num": ma[4]},
+                    {"name": "7-8-9", "str": nbs[5], "num": ma[5]},
+                    {"name": "3-5-7", "str": nbs[6], "num": ma[6]},
+                    {"name": "1-5-9", "str": nbs[7], "num": ma[7]}
                 ]
-                max_val = max([s["val"] for s in sum_lines_data]) if sum_lines_data else 1
-                max_val = max_val if max_val > 0 else 1 
                 
                 sum_html = "<table style='width:100%; border-collapse: collapse; margin-top: 10px; color: inherit;'>"
                 sum_html += "<tr style='border-bottom: 2px solid var(--border-color);'><th style='padding:8px; text-align:center;'>Sum Lines</th><th style='padding:8px; text-align:center;'>Sum</th><th style='padding:8px; width:50%;'></th></tr>"
                 for s in sum_lines_data:
-                    bar_w = int((s["val"] / max_val) * 100)
-                    bar = f"<div style='width:{bar_w}%; background-color:#4a90e2; height:12px; border-radius:3px;'></div>" if s["val"] > 0 else ""
-                    sum_html += f"<tr><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center;'>{s['name']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center; font-weight:bold;'>{s['val']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color);'>{bar}</td></tr>"
+                    bar_w = int((s["num"] / max_val) * 100) if s["str"] != "_" else 0
+                    bar = f"<div style='width:{bar_w}%; background-color:#4a90e2; height:12px; border-radius:3px;'></div>" if bar_w > 0 else ""
+                    sum_html += f"<tr><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center;'>{s['name']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center; font-weight:bold;'>{s['str']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color);'>{bar}</td></tr>"
                 sum_html += "</table>"
                 st.markdown(sum_html, unsafe_allow_html=True)
 
