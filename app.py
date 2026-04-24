@@ -17,9 +17,6 @@ except ImportError:
 # ==========================================
 @st.cache_data(show_spinner=False)
 def get_gemini_reading(api_key, model, prompt):
-    """
-    同じprompt内容であれば、APIを叩かずにキャッシュから結果を返す。
-    """
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
@@ -27,7 +24,6 @@ def get_gemini_reading(api_key, model, prompt):
     with urllib.request.urlopen(req) as response:
         result = json.loads(response.read().decode('utf-8'))
         raw_text = result['candidates'][0]['content']['parts'][0]['text']
-        # アスタリスクを削除して返す
         return raw_text.replace('*', '')
 
 # ==========================================
@@ -384,9 +380,6 @@ class NatalChart:
                 pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
             
-        # ==========================================
-        # 日本語の手動折り返し処理（維持）
-        # ==========================================
         if ai_text:
             pdf.add_page()
             pdf.set_fill_color(245, 247, 250)
@@ -505,7 +498,8 @@ table th, table td {
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🌟 Natal Chart Web Dashboard")
+# ★文字化け対策: 全ての絵文字をUnicodeエスケープ（暗号）に置き換えました★
+st.title("\U0001f31f Natal Chart Web Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
 
 if "show_dashboard" not in st.session_state:
@@ -532,10 +526,10 @@ if st.session_state.show_dashboard:
             res = chart.results
             c = res["Counts"]
             
-            with st.expander("📄 Show Original Text Report Format", expanded=False):
+            with st.expander("\U0001f4c4 Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
-            st.markdown('<div class="section-header">🧩 [ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\U0001f9e9 [ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
             
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("Birth Number", res["BirthNum"])
@@ -552,13 +546,13 @@ if st.session_state.show_dashboard:
             c8.metric("New Strengths", res["Strengths"])
             c9.metric("Sub Theme", res["SubTheme"])
 
-            st.markdown('<div class="section-header">⏳ [ Turning Point Ages ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\u23f3 [ Turning Point Ages ]</div>', unsafe_allow_html=True)
             c1, c2, c3 = st.columns(3)
             c1.metric("1st Turning Point", f"{res['TP'][0]} yrs")
             c2.metric("2nd Turning Point (Main)", f"{res['TP'][1]} yrs")
             c3.metric("3rd Turning Point", f"{res['TP'][2]} yrs")
 
-            st.markdown('<div class="section-header">📅 [ Life Cycle Stages ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\U0001f4c5 [ Life Cycle Stages ]</div>', unsafe_allow_html=True)
             df_stages = pd.DataFrame(res["Stages"])
             df_stages.columns = ["Term", "Age Range", "Milestone", "Rout", "Hardships"]
             
@@ -567,7 +561,7 @@ if st.session_state.show_dashboard:
                 .hide(axis="index")
             st.table(styled_stages)
             
-            st.markdown('<div class="section-header">🔮 [ Nine Box ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\U0001f52e [ Nine Box ]</div>', unsafe_allow_html=True)
             
             col_box, col_sums = st.columns([1, 1])
             with col_box:
@@ -635,7 +629,7 @@ if st.session_state.show_dashboard:
                 sum_html += "</table>"
                 st.markdown(sum_html, unsafe_allow_html=True)
 
-            st.markdown('<div class="section-header">🌊 [ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\U0001f30a [ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
             
             cycle_keywords = {
                 1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
@@ -673,13 +667,13 @@ if st.session_state.show_dashboard:
             with col_c: st.table(style_cycles(create_cycle_df(54, 81)))
 
             # --- 4. Personalized Reading ---
-            st.markdown('<div class="section-header">🤖 [ Personalized Reading ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\U0001f916 [ Personalized Reading ]</div>', unsafe_allow_html=True)
             st.write("上記の結果に基づいたあなた専用のパーソナライズされた鑑定書を生成します。")
 
             try:
                 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 
-                if st.button("✨ Generate Reading"):
+                if st.button("\u2728 Generate Reading"):
                     try:
                         with open("prompt_template.txt", "r", encoding="utf-8") as f:
                             template_text = f.read()
@@ -692,7 +686,6 @@ if st.session_state.show_dashboard:
 
                     with st.spinner("鑑定書を作成しています... (数秒お待ちください)"):
                         try:
-                            # ★キャッシュ機能付き関数を呼び出し★
                             st.session_state.ai_reading = get_gemini_reading(api_key, selected_model, prompt)
                         except urllib.error.HTTPError as e:
                             if e.code == 429: st.error("Error: 無料枠の制限に達しました。1分待って再試行してください。")
@@ -702,7 +695,7 @@ if st.session_state.show_dashboard:
             except Exception as e: st.error(f"システムエラー: {e}")
             
             if st.session_state.get("ai_reading"):
-                st.success("✨ 鑑定書の生成が完了しました！")
+                st.success("\u2728 鑑定書の生成が完了しました！")
                 formatted_html = ""
                 for line in st.session_state.ai_reading.split('\n'):
                     line = line.strip()
@@ -717,13 +710,13 @@ if st.session_state.show_dashboard:
                 st.markdown(f"""<div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">{formatted_html}</div>""", unsafe_allow_html=True)
 
             # --- PDF Export セクション ---
-            st.markdown('<div class="section-header">📥 [ Export Report ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">\U0001f4e5 [ Export Report ]</div>', unsafe_allow_html=True)
             if HAS_FPDF:
                 pdf_filename = f"{name_in.replace(' ', '_')}_Graphical.pdf"
                 ai_text = st.session_state.get("ai_reading", None)
                 chart.export_graphical_pdf(pdf_filename, ai_text=ai_text)
                 with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button(label="📄 Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
+                    st.download_button(label="\U0001f4c4 Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
     else: st.error("Error: Birthday must be exactly 8 digits.")
