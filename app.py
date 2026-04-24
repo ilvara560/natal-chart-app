@@ -77,14 +77,10 @@ class NatalChart:
             0 if 0 in (counts[1], counts[4], counts[7]) else counts[1] + counts[4] + counts[7],
             0 if 0 in (counts[1], counts[2], counts[3]) else counts[1] + counts[2] + counts[3],
             0 if 0 in (counts[4], counts[5], counts[6]) else counts[4] + counts[5] + counts[6],
-            0 if 0 in (counts[7], list(counts.values()), counts[9]) else counts[7] + counts[8] + counts[9], # safety
+            0 if 0 in (counts[7], counts[8], counts[9]) else counts[7] + counts[8] + counts[9],
             0 if 0 in (counts[3], counts[5], counts[7]) else counts[3] + counts[5] + counts[7],
             0 if 0 in (counts[1], counts[5], counts[9]) else counts[1] + counts[5] + counts[9]
         ]
-        
-        # fix magic array index 5
-        magic_array[5] = 0 if 0 in (counts[7], counts[8], counts[9]) else counts[7] + counts[8] + counts[9]
-        
         max_nine = max(magic_array)
         nine_box_sums = [str(v) if v == max_nine else "_" for v in magic_array]
         
@@ -370,7 +366,9 @@ class NatalChart:
                 pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
             
-        # --- AI ReadingのPDFページ追加処理（見出し装飾と左揃えレイアウト） ---
+        # ==========================================
+        # ★完全修正版：日本語の手動折り返し処理★
+        # ==========================================
         if ai_text:
             pdf.add_page()
             pdf.set_fill_color(245, 247, 250)
@@ -381,10 +379,35 @@ class NatalChart:
             pdf.ln(5)
             
             font_filename = "NotoSansJP-Regular.ttf"
-
+            font_url = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP-Regular.ttf"
+            
+            is_valid_font = False
             if os.path.exists(font_filename):
                 try:
+                    with open(font_filename, "rb") as f:
+                        header = f.read(4)
+                        if header in (b'\x00\x01\x00\x00', b'OTTO', b'true'):
+                            is_valid_font = True
+                except:
+                    pass
+            
+            if not is_valid_font:
+                if os.path.exists(font_filename):
+                    os.remove(font_filename)
+                try:
+                    req_font = urllib.request.Request(font_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req_font) as response, open(font_filename, 'wb') as out_file:
+                        out_file.write(response.read())
+                    is_valid_font = True
+                except Exception:
+                    pass
+
+            if is_valid_font:
+                try:
                     pdf.add_font("NotoSansJP", "", font_filename)
+                    
+                    # PDFの横幅（A4サイズ210mm - 左右の余白10mmずつ - 少しの余裕 = 約180mm）
+                    max_width = 180  
                     
                     for line in ai_text.split('\n'):
                         line = line.strip()
@@ -392,36 +415,54 @@ class NatalChart:
                             pdf.ln(3)
                             continue
                             
+                        is_heading = False
+                        display_text = line
+                        
+                        # 見出しデザイン設定
                         if line.startswith('#'):
+                            is_heading = True
                             level = len(line) - len(line.lstrip('#'))
-                            title_text = line.lstrip('#').strip()
+                            display_text = line.lstrip('#').strip()
                             
                             pdf.ln(3)
                             pdf.set_text_color(74, 144, 226)
-                            
                             if level == 1:
                                 pdf.set_font("NotoSansJP", "", 14)
                             elif level == 2:
                                 pdf.set_font("NotoSansJP", "", 13)
                             else:
                                 pdf.set_font("NotoSansJP", "", 12)
-                                
-                            pdf.multi_cell(0, 8, title_text, align="L")
-                            
+                        else:
                             pdf.set_text_color(0, 0, 0)
                             pdf.set_font("NotoSansJP", "", 10)
                             
-                        else:
+                        # 1文字ずつ横幅を足し算して、限界が来たら改行する手作り処理
+                        current_str = ""
+                        line_height = 8 if is_heading else 6
+                        
+                        for char in display_text:
+                            # 限界幅を超えたら書き出してリセット
+                            if pdf.get_string_width(current_str + char) > max_width:
+                                pdf.cell(0, line_height, current_str, new_x="LMARGIN", new_y="NEXT", align="L")
+                                current_str = char
+                            else:
+                                current_str += char
+                                
+                        # 行の最後に残った文字を書き出す
+                        if current_str:
+                            pdf.cell(0, line_height, current_str, new_x="LMARGIN", new_y="NEXT", align="L")
+                            
+                        # 見出しが終わったら元の黒文字に戻す
+                        if is_heading:
+                            pdf.set_text_color(0, 0, 0)
                             pdf.set_font("NotoSansJP", "", 10)
-                            pdf.multi_cell(0, 6, line, align="L")
 
                 except Exception:
                     pdf.set_font("Helvetica", "", 10)
-                    pdf.multi_cell(0, 6, "(Font loading error: The font file appears to be invalid or corrupted.)", align="L")
-                    pdf.multi_cell(0, 6, "(Please delete 'NotoSansJP-Regular.ttf', download the RAW file properly, and try again.)", align="L")
+                    pdf.cell(0, 6, "(Font integration error. Please view the reading on the Web Dashboard.)", new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.set_font("Helvetica", "", 10)
-                pdf.multi_cell(0, 6, "(Font 'NotoSansJP-Regular.ttf' not found. Please place it in the app folder.)", align="L")
+                pdf.cell(0, 6, "(Font download failed. Please view the Japanese reading on the Web Dashboard.)", new_x="LMARGIN", new_y="NEXT")
 
         pdf.output(filename)
         return filename
@@ -683,9 +724,23 @@ if st.session_state.show_dashboard:
             
             if st.session_state.get("ai_reading"):
                 st.success("✨ 鑑定書の生成が完了しました！")
+                
+                formatted_html = ""
+                for line in st.session_state.ai_reading.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        formatted_html += "<div style='height: 12px;'></div>"
+                        continue
+                        
+                    if line.startswith('#'):
+                        title_text = line.lstrip('#').strip()
+                        formatted_html += f"<div style='color: #4a90e2; font-size: 1.3em; font-weight: 600; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;'>{title_text}</div>"
+                    else:
+                        formatted_html += f"<div style='margin-bottom: 8px;'>{line}</div>"
+
                 st.markdown(f"""
-                <div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 25px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">
-                    {st.session_state.ai_reading.replace(chr(10), '<br>')}
+                <div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">
+                    {formatted_html}
                 </div>
                 """, unsafe_allow_html=True)
 
