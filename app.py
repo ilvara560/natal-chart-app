@@ -13,6 +13,24 @@ except ImportError:
     HAS_FPDF = False
 
 # ==========================================
+# 1. API呼び出し関数（キャッシュ機能付き）
+# ==========================================
+@st.cache_data(show_spinner=False)
+def get_gemini_reading(api_key, model, prompt):
+    """
+    同じprompt内容であれば、APIを叩かずにキャッシュから結果を返す。
+    """
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
+    req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
+    
+    with urllib.request.urlopen(req) as response:
+        result = json.loads(response.read().decode('utf-8'))
+        raw_text = result['candidates'][0]['content']['parts'][0]['text']
+        # アスタリスクを削除して返す
+        return raw_text.replace('*', '')
+
+# ==========================================
 # ロジック・テキスト出力・PDF出力は「完全」に維持
 # ==========================================
 class NatalChart:
@@ -367,7 +385,7 @@ class NatalChart:
             pdf.ln()
             
         # ==========================================
-        # ★完全修正版：日本語の手動折り返し処理★
+        # 日本語の手動折り返し処理（維持）
         # ==========================================
         if ai_text:
             pdf.add_page()
@@ -392,77 +410,56 @@ class NatalChart:
                     pass
             
             if not is_valid_font:
-                if os.path.exists(font_filename):
-                    os.remove(font_filename)
+                if os.path.exists(font_filename): os.remove(font_filename)
                 try:
                     req_font = urllib.request.Request(font_url, headers={'User-Agent': 'Mozilla/5.0'})
                     with urllib.request.urlopen(req_font) as response, open(font_filename, 'wb') as out_file:
                         out_file.write(response.read())
                     is_valid_font = True
-                except Exception:
-                    pass
+                except Exception: pass
 
             if is_valid_font:
                 try:
                     pdf.add_font("NotoSansJP", "", font_filename)
-                    
-                    # PDFの横幅（A4サイズ210mm - 左右の余白10mmずつ - 少しの余裕 = 約180mm）
                     max_width = 180  
-                    
                     for line in ai_text.split('\n'):
                         line = line.strip()
                         if not line:
                             pdf.ln(3)
                             continue
-                            
                         is_heading = False
                         display_text = line
-                        
-                        # 見出しデザイン設定
                         if line.startswith('#'):
                             is_heading = True
                             level = len(line) - len(line.lstrip('#'))
                             display_text = line.lstrip('#').strip()
-                            
                             pdf.ln(3)
                             pdf.set_text_color(74, 144, 226)
-                            if level == 1:
-                                pdf.set_font("NotoSansJP", "", 14)
-                            elif level == 2:
-                                pdf.set_font("NotoSansJP", "", 13)
-                            else:
-                                pdf.set_font("NotoSansJP", "", 12)
+                            if level == 1: pdf.set_font("NotoSansJP", "", 14)
+                            elif level == 2: pdf.set_font("NotoSansJP", "", 13)
+                            else: pdf.set_font("NotoSansJP", "", 12)
                         else:
                             pdf.set_text_color(0, 0, 0)
                             pdf.set_font("NotoSansJP", "", 10)
-                            
-                        # 1文字ずつ横幅を足し算して、限界が来たら改行する手作り処理
                         current_str = ""
                         line_height = 8 if is_heading else 6
-                        
                         for char in display_text:
-                            # 限界幅を超えたら書き出してリセット
                             if pdf.get_string_width(current_str + char) > max_width:
                                 pdf.cell(0, line_height, current_str, new_x="LMARGIN", new_y="NEXT", align="L")
                                 current_str = char
                             else:
                                 current_str += char
-                                
-                        # 行の最後に残った文字を書き出す
                         if current_str:
                             pdf.cell(0, line_height, current_str, new_x="LMARGIN", new_y="NEXT", align="L")
-                            
-                        # 見出しが終わったら元の黒文字に戻す
                         if is_heading:
                             pdf.set_text_color(0, 0, 0)
                             pdf.set_font("NotoSansJP", "", 10)
-
                 except Exception:
                     pdf.set_font("Helvetica", "", 10)
-                    pdf.cell(0, 6, "(Font integration error. Please view the reading on the Web Dashboard.)", new_x="LMARGIN", new_y="NEXT")
+                    pdf.cell(0, 6, "(Font integration error.)", new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.set_font("Helvetica", "", 10)
-                pdf.cell(0, 6, "(Font download failed. Please view the Japanese reading on the Web Dashboard.)", new_x="LMARGIN", new_y="NEXT")
+                pdf.cell(0, 6, "(Font download failed.)", new_x="LMARGIN", new_y="NEXT")
 
         pdf.output(filename)
         return filename
@@ -671,12 +668,9 @@ if st.session_state.show_dashboard:
                                .set_table_styles([dict(selector='th', props=[('text-align', 'center')])]) \
                                .hide(axis="index")
 
-            with col_a:
-                st.table(style_cycles(create_cycle_df(0, 27)))
-            with col_b:
-                st.table(style_cycles(create_cycle_df(27, 54)))
-            with col_c:
-                st.table(style_cycles(create_cycle_df(54, 81)))
+            with col_a: st.table(style_cycles(create_cycle_df(0, 27)))
+            with col_b: st.table(style_cycles(create_cycle_df(27, 54)))
+            with col_c: st.table(style_cycles(create_cycle_df(54, 81)))
 
             # --- 4. Personalized Reading ---
             st.markdown('<div class="section-header">🤖 [ Personalized Reading ]</div>', unsafe_allow_html=True)
@@ -686,83 +680,50 @@ if st.session_state.show_dashboard:
                 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 
                 if st.button("✨ Generate Reading"):
-                    
                     try:
                         with open("prompt_template.txt", "r", encoding="utf-8") as f:
                             template_text = f.read()
                     except FileNotFoundError:
-                        st.error("Error: 'prompt_template.txt' が見つかりません。app.pyと同じフォルダに作成してください。")
+                        st.error("Error: 'prompt_template.txt' が見つかりません。")
                         st.stop()
                         
-                    prompt = template_text.format(
-                        name=name_in,
-                        full_report=report_text
-                    )
-                    
+                    prompt = template_text.format(name=name_in, full_report=report_text)
                     selected_model = "gemini-2.5-flash"
 
                     with st.spinner("鑑定書を作成しています... (数秒お待ちください)"):
-                        url = f"https://generativelanguage.googleapis.com/v1beta/models/{selected_model}:generateContent?key={api_key}"
-                        data = {"contents": [{"parts": [{"text": prompt}]}]}
-                        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
-                        
                         try:
-                            with urllib.request.urlopen(req) as response:
-                                result = json.loads(response.read().decode('utf-8'))
-                                raw_text = result['candidates'][0]['content']['parts'][0]['text']
-                                st.session_state.ai_reading = raw_text.replace('*', '')
+                            # ★キャッシュ機能付き関数を呼び出し★
+                            st.session_state.ai_reading = get_gemini_reading(api_key, selected_model, prompt)
                         except urllib.error.HTTPError as e:
-                            if e.code == 429:
-                                st.error("Error: Google APIの無料通信枠（1分間の制限）に達しました。1〜2分ほど待ってから、再度ボタンを押してください。")
-                            else:
-                                st.error(f"通信エラーが発生しました: HTTP {e.code}")
+                            if e.code == 429: st.error("Error: 無料枠の制限に達しました。1分待って再試行してください。")
+                            else: st.error(f"通信エラー: HTTP {e.code}")
 
-            except KeyError:
-                st.error("Error: システム設定（APIキー）が完了していません。管理者に連絡してください。")
-            except Exception as e:
-                st.error(f"システムエラー: {e}")
+            except KeyError: st.error("Error: APIキーが設定されていません。")
+            except Exception as e: st.error(f"システムエラー: {e}")
             
             if st.session_state.get("ai_reading"):
                 st.success("✨ 鑑定書の生成が完了しました！")
-                
                 formatted_html = ""
                 for line in st.session_state.ai_reading.split('\n'):
                     line = line.strip()
                     if not line:
                         formatted_html += "<div style='height: 12px;'></div>"
                         continue
-                        
                     if line.startswith('#'):
                         title_text = line.lstrip('#').strip()
                         formatted_html += f"<div style='color: #4a90e2; font-size: 1.3em; font-weight: 600; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;'>{title_text}</div>"
                     else:
                         formatted_html += f"<div style='margin-bottom: 8px;'>{line}</div>"
-
-                st.markdown(f"""
-                <div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">
-                    {formatted_html}
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">{formatted_html}</div>""", unsafe_allow_html=True)
 
             # --- PDF Export セクション ---
             st.markdown('<div class="section-header">📥 [ Export Report ]</div>', unsafe_allow_html=True)
             if HAS_FPDF:
                 pdf_filename = f"{name_in.replace(' ', '_')}_Graphical.pdf"
-                
                 ai_text = st.session_state.get("ai_reading", None)
                 chart.export_graphical_pdf(pdf_filename, ai_text=ai_text)
-                
                 with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button(
-                        label="📄 Download Full Graphical PDF",
-                        data=pdf_file,
-                        file_name=pdf_filename,
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
+                    st.download_button(label="📄 Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
                 os.remove(pdf_filename)
-            else:
-                st.warning(f"PDF export機能が利用できません。ターミナルで以下のコマンドを実行してライブラリをインストールしてください：\n\n`{sys.executable} -m pip install fpdf2`")
-                    
-    else:
-        st.error("Error: Birthday must be exactly 8 digits (YYYYMMDD).")
+            else: st.warning("PDFライブラリが不足しています。")
+    else: st.error("Error: Birthday must be exactly 8 digits.")
