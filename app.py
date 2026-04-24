@@ -19,7 +19,8 @@ except ImportError:
 def get_gemini_reading(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     data = {"contents": [{"parts": [{"text": prompt}]}]}
-    req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
+    # User-Agentを追加してより安全なリクエストに
+    req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
     
     with urllib.request.urlopen(req) as response:
         result = json.loads(response.read().decode('utf-8'))
@@ -380,6 +381,9 @@ class NatalChart:
                 pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
             
+        # ==========================================
+        # 日本語の手動折り返し処理（維持）
+        # ==========================================
         if ai_text:
             pdf.add_page()
             pdf.set_fill_color(245, 247, 250)
@@ -498,7 +502,6 @@ table th, table td {
 </style>
 """, unsafe_allow_html=True)
 
-# ★文字化け対策: 全ての絵文字をUnicodeエスケープ（暗号）に置き換えました★
 st.title("\U0001f31f Natal Chart Web Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
 
@@ -682,17 +685,24 @@ if st.session_state.show_dashboard:
                         st.stop()
                         
                     prompt = template_text.format(name=name_in, full_report=report_text)
+                    
+                    # ⚠️ここを本当に、確実に「gemini-2.5-flash」に直しました⚠️
                     selected_model = "gemini-2.5-flash"
 
                     with st.spinner("鑑定書を作成しています... (数秒お待ちください)"):
                         try:
                             st.session_state.ai_reading = get_gemini_reading(api_key, selected_model, prompt)
                         except urllib.error.HTTPError as e:
-                            if e.code == 429: st.error("Error: 無料枠の制限に達しました。1分待って再試行してください。")
-                            else: st.error(f"通信エラー: HTTP {e.code}")
+                            try:
+                                error_details = e.read().decode('utf-8')
+                                st.error(f"Google API エラー (HTTP {e.code}):\n{error_details}")
+                            except:
+                                st.error(f"通信エラーが発生しました: HTTP {e.code}")
+                        except Exception as e:
+                            st.error(f"システムエラーが発生しました: {e}")
 
             except KeyError: st.error("Error: APIキーが設定されていません。")
-            except Exception as e: st.error(f"システムエラー: {e}")
+            except Exception as e: st.error(f"不明なエラー: {e}")
             
             if st.session_state.get("ai_reading"):
                 st.success("\u2728 鑑定書の生成が完了しました！")
