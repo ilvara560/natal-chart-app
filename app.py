@@ -1,4 +1,8 @@
 import os
+import sys
+import json
+import urllib.request
+import urllib.error
 import streamlit as st
 import pandas as pd
 
@@ -162,7 +166,7 @@ class NatalChart:
         lines.append("=" * 75)
         return "\n".join(lines)
 
-    def export_graphical_pdf(self, filename="Graphical_Report.pdf"):
+    def export_graphical_pdf(self, filename="Graphical_Report.pdf", ai_text=None):
         if not HAS_FPDF: return None
         pdf = FPDF()
         pdf.add_page()
@@ -361,6 +365,32 @@ class NatalChart:
                 pdf.cell(22, 6, theme, border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
                 pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
+            
+        # --- 変更点: エラー詳細をPDFに書き込む ---
+        if ai_text:
+            pdf.add_page()
+            pdf.set_fill_color(245, 247, 250)
+            pdf.set_text_color(74, 144, 226)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 8, " [ Personalized Reading ]", new_x="LMARGIN", new_y="NEXT", fill=True)
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(5)
+            
+            font_filename = "NotoSansJP-Regular.ttf"
+
+            if os.path.exists(font_filename):
+                try:
+                    pdf.add_font("NotoSansJP", "", font_filename)
+                    pdf.set_font("NotoSansJP", "", 10)
+                    pdf.multi_cell(0, 6, ai_text)
+                except Exception as e:
+                    # ここでエラーの具体的な理由をPDFに出力します
+                    pdf.set_font("Helvetica", "", 10)
+                    pdf.multi_cell(0, 6, f"(Font loading error details: {str(e)})")
+                    pdf.multi_cell(0, 6, "Please ensure you downloaded the actual TTF file from the browser, not an HTML page via terminal.")
+            else:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.multi_cell(0, 6, "(Font 'NotoSansJP-Regular.ttf' not found. Please download it from the provided link and place it in the app folder.)")
 
         pdf.output(filename)
         return filename
@@ -409,6 +439,9 @@ table th, table td {
 st.title("🌟 Natal Chart Web Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
 
+if "show_dashboard" not in st.session_state:
+    st.session_state.show_dashboard = False
+
 with st.form("input_form"):
     col1, col2 = st.columns(2)
     with col1:
@@ -419,6 +452,10 @@ with st.form("input_form"):
     submitted = st.form_submit_button("Generate Dashboard")
 
 if submitted:
+    st.session_state.show_dashboard = True
+    st.session_state.ai_reading = None
+
+if st.session_state.show_dashboard:
     if len(birth_in) == 8 and birth_in.isdigit():
         with st.spinner("Analyzing your numbers..."):
             chart = NatalChart(name=name_in, birthdate=birth_in)
@@ -569,10 +606,64 @@ if submitted:
             with col_c:
                 st.table(style_cycles(create_cycle_df(54, 81)))
 
+            # --- 4. Personalized Reading ---
+            st.markdown('<div class="section-header">🤖 [ Personalized Reading ]</div>', unsafe_allow_html=True)
+            st.write("上記の結果に基づいたあなた専用のパーソナライズされた鑑定書を生成します。")
+
+            try:
+                api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
+
+                if st.button("✨ Generate Reading"):
+                    
+                    try:
+                        with open("prompt_template.txt", "r", encoding="utf-8") as f:
+                            template_text = f.read()
+                    except FileNotFoundError:
+                        st.error("Error: 'prompt_template.txt' が見つかりません。app.pyと同じフォルダに作成してください。")
+                        st.stop()
+                        
+                    prompt = template_text.format(
+                        name=name_in,
+                        full_report=report_text
+                    )
+                    
+                    selected_model = "gemini-2.5-flash"
+
+                    with st.spinner("鑑定書を作成しています... (数秒お待ちください)"):
+                        url = f"https://generativelanguage.googleapis.com/v1beta/models/{selected_model}:generateContent?key={api_key}"
+                        data = {"contents": [{"parts": [{"text": prompt}]}]}
+                        req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json'})
+                        
+                        try:
+                            with urllib.request.urlopen(req) as response:
+                                result = json.loads(response.read().decode('utf-8'))
+                                st.session_state.ai_reading = result['candidates'][0]['content']['parts'][0]['text']
+                        except urllib.error.HTTPError as e:
+                            if e.code == 429:
+                                st.error("Error: Google APIの無料通信枠（1分間の制限）に達しました。1〜2分ほど待ってから、再度ボタンを押してください。")
+                            else:
+                                st.error(f"通信エラーが発生しました: HTTP {e.code}")
+
+            except KeyError:
+                st.error("Error: システム設定（APIキー）が完了していません。管理者に連絡してください。")
+            except Exception as e:
+                st.error(f"システムエラー: {e}")
+            
+            if st.session_state.get("ai_reading"):
+                st.success("✨ 鑑定書の生成が完了しました！")
+                st.markdown(f"""
+                <div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 25px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">
+                    {st.session_state.ai_reading.replace(chr(10), '<br>')}
+                </div>
+                """, unsafe_allow_html=True)
+
+            # --- PDF Export セクション ---
             st.markdown('<div class="section-header">📥 [ Export Report ]</div>', unsafe_allow_html=True)
             if HAS_FPDF:
                 pdf_filename = f"{name_in.replace(' ', '_')}_Graphical.pdf"
-                chart.export_graphical_pdf(pdf_filename)
+                
+                ai_text = st.session_state.get("ai_reading", None)
+                chart.export_graphical_pdf(pdf_filename, ai_text=ai_text)
                 
                 with open(pdf_filename, "rb") as pdf_file:
                     st.download_button(
@@ -584,6 +675,7 @@ if submitted:
                     )
                 os.remove(pdf_filename)
             else:
-                st.warning("PDF export is unavailable. Please install 'fpdf'.")
+                st.warning(f"PDF export機能が利用できません。ターミナルで以下のコマンドを実行してライブラリをインストールしてください：\n\n`{sys.executable} -m pip install fpdf2`")
+                    
     else:
         st.error("Error: Birthday must be exactly 8 digits (YYYYMMDD).")
