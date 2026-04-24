@@ -77,10 +77,14 @@ class NatalChart:
             0 if 0 in (counts[1], counts[4], counts[7]) else counts[1] + counts[4] + counts[7],
             0 if 0 in (counts[1], counts[2], counts[3]) else counts[1] + counts[2] + counts[3],
             0 if 0 in (counts[4], counts[5], counts[6]) else counts[4] + counts[5] + counts[6],
-            0 if 0 in (counts[7], counts[8], counts[9]) else counts[7] + counts[8] + counts[9],
+            0 if 0 in (counts[7], list(counts.values()), counts[9]) else counts[7] + counts[8] + counts[9], # safety
             0 if 0 in (counts[3], counts[5], counts[7]) else counts[3] + counts[5] + counts[7],
             0 if 0 in (counts[1], counts[5], counts[9]) else counts[1] + counts[5] + counts[9]
         ]
+        
+        # fix magic array index 5
+        magic_array[5] = 0 if 0 in (counts[7], counts[8], counts[9]) else counts[7] + counts[8] + counts[9]
+        
         max_nine = max(magic_array)
         nine_box_sums = [str(v) if v == max_nine else "_" for v in magic_array]
         
@@ -366,7 +370,7 @@ class NatalChart:
                 pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
             
-        # --- 変更点: エラー詳細をPDFに書き込む ---
+        # --- AI ReadingのPDFページ追加処理（見出し装飾と左揃えレイアウト） ---
         if ai_text:
             pdf.add_page()
             pdf.set_fill_color(245, 247, 250)
@@ -381,16 +385,43 @@ class NatalChart:
             if os.path.exists(font_filename):
                 try:
                     pdf.add_font("NotoSansJP", "", font_filename)
-                    pdf.set_font("NotoSansJP", "", 10)
-                    pdf.multi_cell(0, 6, ai_text)
-                except Exception as e:
-                    # ここでエラーの具体的な理由をPDFに出力します
+                    
+                    for line in ai_text.split('\n'):
+                        line = line.strip()
+                        if not line:
+                            pdf.ln(3)
+                            continue
+                            
+                        if line.startswith('#'):
+                            level = len(line) - len(line.lstrip('#'))
+                            title_text = line.lstrip('#').strip()
+                            
+                            pdf.ln(3)
+                            pdf.set_text_color(74, 144, 226)
+                            
+                            if level == 1:
+                                pdf.set_font("NotoSansJP", "", 14)
+                            elif level == 2:
+                                pdf.set_font("NotoSansJP", "", 13)
+                            else:
+                                pdf.set_font("NotoSansJP", "", 12)
+                                
+                            pdf.multi_cell(0, 8, title_text, align="L")
+                            
+                            pdf.set_text_color(0, 0, 0)
+                            pdf.set_font("NotoSansJP", "", 10)
+                            
+                        else:
+                            pdf.set_font("NotoSansJP", "", 10)
+                            pdf.multi_cell(0, 6, line, align="L")
+
+                except Exception:
                     pdf.set_font("Helvetica", "", 10)
-                    pdf.multi_cell(0, 6, f"(Font loading error details: {str(e)})")
-                    pdf.multi_cell(0, 6, "Please ensure you downloaded the actual TTF file from the browser, not an HTML page via terminal.")
+                    pdf.multi_cell(0, 6, "(Font loading error: The font file appears to be invalid or corrupted.)", align="L")
+                    pdf.multi_cell(0, 6, "(Please delete 'NotoSansJP-Regular.ttf', download the RAW file properly, and try again.)", align="L")
             else:
                 pdf.set_font("Helvetica", "", 10)
-                pdf.multi_cell(0, 6, "(Font 'NotoSansJP-Regular.ttf' not found. Please download it from the provided link and place it in the app folder.)")
+                pdf.multi_cell(0, 6, "(Font 'NotoSansJP-Regular.ttf' not found. Please place it in the app folder.)", align="L")
 
         pdf.output(filename)
         return filename
@@ -637,7 +668,8 @@ if st.session_state.show_dashboard:
                         try:
                             with urllib.request.urlopen(req) as response:
                                 result = json.loads(response.read().decode('utf-8'))
-                                st.session_state.ai_reading = result['candidates'][0]['content']['parts'][0]['text']
+                                raw_text = result['candidates'][0]['content']['parts'][0]['text']
+                                st.session_state.ai_reading = raw_text.replace('*', '')
                         except urllib.error.HTTPError as e:
                             if e.code == 429:
                                 st.error("Error: Google APIの無料通信枠（1分間の制限）に達しました。1〜2分ほど待ってから、再度ボタンを押してください。")
