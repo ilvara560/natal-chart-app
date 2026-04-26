@@ -58,17 +58,20 @@ class NatalChart:
     def _calculate(self):
         b_year, b_month, b_day = int(self.birthdate[:4]), int(self.birthdate[4:6]), int(self.birthdate[6:8])
         
-        # VBAのロジックに忠実な初期計算
-        y_raw = sum(int(d) for d in str(b_year))
-        m_raw = sum(int(d) for d in f"{b_month:02d}")
-        
-        d_raw = b_day
-        while d_raw >= 10:
-            d_raw = sum(int(digit) for digit in str(d_raw))
+        # VBA Ver.6.r.0 '- 2026.04.26 (2)' ロジックに準拠
+        y_raw = sum(int(d) for d in str(b_year))      # 年の各桁の和
+        m_raw = (b_month // 10) + (b_month % 10)      # 月の各桁の和
+        d_raw = (b_day // 10) + (b_day % 10)          # 日の各桁の和
 
-        # ★追加：Carmic Number の算出
-        carmic1 = y_raw + m_raw + d_raw
-        carmic2 = sum(int(d) for d in str(y_raw)) + sum(int(d) for d in str(m_raw)) + sum(int(d) for d in str(d_raw))
+        # ★ Carmic Number の算出 (VBA 818-841行目)
+        carmic1 = y_raw + m_raw + d_raw               # 全桁の単純合算
+        
+        # carmic2: 各項目の和をさらに10の位と1の位に分けて足す
+        def vba_reduce_once(n):
+            return (n // 10) + (n % 10)
+        carmic2 = vba_reduce_once(y_raw) + vba_reduce_once(m_raw) + vba_reduce_once(d_raw)
+        
+        # carmic3: YYYY+MM+DD の合計値の全桁和
         a0 = b_year + b_month + b_day
         carmic3 = sum(int(d) for d in str(a0))
         
@@ -76,12 +79,10 @@ class NatalChart:
         for c in (carmic1, carmic2, carmic3):
             if c in (13, 14, 16, 19):
                 carmic_0 = c
-                
         carmic_str = str(carmic_0) if carmic_0 != 0 else "-"
 
-        # ★変更：Birth Numberのマスターナンバー（11, 22）判定
+        # ★ Birth Number のマスターナンバー判定 (VBA 857-862行目)
         raw_birth = y_raw + m_raw + d_raw
-        
         display_birth_num = self._reduce_to_single(raw_birth)
         temp_val = raw_birth
         while temp_val >= 10:
@@ -90,7 +91,7 @@ class NatalChart:
                 break
             temp_val = sum(int(digit) for digit in str(temp_val))
 
-        # 以降の計算用の変数（必ず1桁に還元）
+        # 以降の計算用（1桁還元）
         y_num = self._reduce_to_single(y_raw)
         m_num = self._reduce_to_single(b_month)
         d_num = self._reduce_to_single(b_day)
@@ -577,7 +578,6 @@ if st.session_state.show_dashboard:
             
             st.write("") 
             
-            # ★変更：カラムを5列にしてCarmic Numberを追加
             c6, c7, c8, c9, c10 = st.columns(5)
             c6.metric("Stage Number", res["StageNum"])
             c7.metric("Challenge Number", res["ChallNum"])
@@ -720,7 +720,6 @@ if st.session_state.show_dashboard:
                         st.error("Error: 'prompt_template.txt' が見つかりません。")
                         st.stop()
                     
-                    # 日本時間（JST）を取得
                     JST = timezone(timedelta(hours=+9), 'JST')
                     current_time_str = datetime.now(JST).strftime("%Y年%m月%d日")
                         
