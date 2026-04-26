@@ -5,6 +5,7 @@ import urllib.request
 import urllib.error
 import streamlit as st
 import pandas as pd
+from datetime import datetime, timezone, timedelta
 
 try:
     from fpdf import FPDF
@@ -127,8 +128,8 @@ class NatalChart:
         lines.append(f"  Realization Number : {res['RealizNum']}")
         lines.append(f"  Stage Number       : {res['StageNum']}")
         lines.append(f"  Challenge Number   : {res['ChallNum']}")
-        lines.append(f"  New Strengths      : {res['Strengths']}")
-        lines.append(f"  Sub Theme          : {res['SubTheme']}")
+        lines.append(f"  New Strength       : {res['Strengths']}")
+        lines.append(f"  Hidden Theme       : {res['SubTheme']}")
         lines.append("-" * 75)
         lines.append(" [ Turning Point Ages ]")
         lines.append(f"  1st Turning Point : {res['TP'][0]}")
@@ -155,12 +156,12 @@ class NatalChart:
         lines.append("-" * 75)
         lines.append(" [ Cycle 1-9 Status ]")
         lines.append("  1: Beginning   2: Alignment   3: Creation   4: Stability   5: Movement")
-        lines.append("  6: Love        7: Refrection  8: Enrich     9: Completion")
+        lines.append("  6: Love        7: Reflection    8: Enrichment  9: Completion")
         lines.append("-" * 75)
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-            6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
+            6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
         }
         
         lines.append(" [ Year Cycle Table ]")
@@ -204,7 +205,7 @@ class NatalChart:
         res = self.results
         
         data_left = [["Birth Number", res["BirthNum"]], ["Destiny Number", res["DestinyNum"]], ["Soul Number", res["SoulNum"]], ["Personality Number", res["PersoNum"]], ["Realization Number", res["RealizNum"]]]
-        data_right = [["Stage Number", res["StageNum"]], ["Challenge Number", res["ChallNum"]], ["New Strengths", res["Strengths"]], ["Sub Theme", res["SubTheme"]]]
+        data_right = [["Stage Number", res["StageNum"]], ["Challenge Number", res["ChallNum"]], ["New Strength", res["Strengths"]], ["Hidden Theme", res["SubTheme"]]]
         
         y_start = pdf.get_y()
         for item in data_left:
@@ -249,7 +250,8 @@ class NatalChart:
         
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(30, 7, "Term", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(40, 7, "Age Range", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        # ★ ここを "Age Range" から "Age" に変更しました
+        pdf.cell(40, 7, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C")
         pdf.cell(30, 7, "Milestone", border=1, new_x="RIGHT", new_y="TOP", align="C")
         pdf.cell(30, 7, "Rout", border=1, new_x="RIGHT", new_y="TOP", align="C")
         pdf.cell(30, 7, "Hardships", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
@@ -336,7 +338,7 @@ class NatalChart:
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-            6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
+            6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
         }
 
         def get_cycle_rgb(cycle):
@@ -498,8 +500,7 @@ table th, table td {
 </style>
 """, unsafe_allow_html=True)
 
-# ★タイトルのアイコンのみ削除しました★
-st.title("Natal Chart Dashboard")
+st.title("Natal Chart Web Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
 
 if "show_dashboard" not in st.session_state:
@@ -526,11 +527,9 @@ if st.session_state.show_dashboard:
             res = chart.results
             c = res["Counts"]
             
-            # ★レイアウト復元：アイコン付きのエクスパンダー★
             with st.expander("📄 Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
-            # ★レイアウト復元：アイコン付きのセクションヘッダー★
             st.markdown('<div class="section-header">🧩 [ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
             
             c1, c2, c3, c4, c5 = st.columns(5)
@@ -545,8 +544,8 @@ if st.session_state.show_dashboard:
             c6, c7, c8, c9 = st.columns(4)
             c6.metric("Stage Number", res["StageNum"])
             c7.metric("Challenge Number", res["ChallNum"])
-            c8.metric("New Strengths", res["Strengths"])
-            c9.metric("Sub Theme", res["SubTheme"])
+            c8.metric("New Strength", res["Strengths"])
+            c9.metric("Hidden Theme", res["SubTheme"])
 
             st.markdown('<div class="section-header">⌛ [ Turning Point Ages ]</div>', unsafe_allow_html=True)
             c1, c2, c3 = st.columns(3)
@@ -556,7 +555,8 @@ if st.session_state.show_dashboard:
 
             st.markdown('<div class="section-header">📅 [ Life Cycle Stages ]</div>', unsafe_allow_html=True)
             df_stages = pd.DataFrame(res["Stages"])
-            df_stages.columns = ["Term", "Age Range", "Milestone", "Rout", "Hardships"]
+            # ★ ここを "Age Range" から "Age" に変更しました
+            df_stages.columns = ["Term", "Age", "Milestone", "Rout", "Hardships"]
             
             styled_stages = df_stages.style.set_properties(**{'text-align': 'center'}) \
                 .set_table_styles([dict(selector='th', props=[('text-align', 'center')])]) \
@@ -635,7 +635,7 @@ if st.session_state.show_dashboard:
             
             cycle_keywords = {
                 1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-                6: "Love", 7: "Refrection", 8: "Enrich", 9: "Completion"
+                6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
             }
             
             col_a, col_b, col_c = st.columns(3)
@@ -682,8 +682,16 @@ if st.session_state.show_dashboard:
                     except FileNotFoundError:
                         st.error("Error: 'prompt_template.txt' が見つかりません。")
                         st.stop()
+                    
+                    # 日本時間（JST）を取得
+                    JST = timezone(timedelta(hours=+9), 'JST')
+                    current_time_str = datetime.now(JST).strftime("%Y年%m月%d日")
                         
-                    prompt = template_text.format(name=name_in, full_report=report_text)
+                    prompt = template_text.format(
+                        name=name_in, 
+                        full_report=report_text,
+                        current_date=current_time_str
+                    )
                     selected_model = "gemini-2.5-flash"
 
                     with st.spinner("鑑定書を作成しています... (数秒お待ちください)"):
