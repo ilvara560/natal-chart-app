@@ -57,10 +57,45 @@ class NatalChart:
 
     def _calculate(self):
         b_year, b_month, b_day = int(self.birthdate[:4]), int(self.birthdate[4:6]), int(self.birthdate[6:8])
-        y_num = self._reduce_to_single(sum(int(d) for d in str(b_year)))
-        m_num, d_num = self._reduce_to_single(b_month), self._reduce_to_single(b_day)
+        
+        # VBAのロジックに忠実な初期計算
+        y_raw = sum(int(d) for d in str(b_year))
+        m_raw = sum(int(d) for d in f"{b_month:02d}")
+        
+        d_raw = b_day
+        while d_raw >= 10:
+            d_raw = sum(int(digit) for digit in str(d_raw))
 
-        birth_num = self._reduce_to_single(y_num + m_num + d_num)
+        # ★追加：Carmic Number の算出
+        carmic1 = y_raw + m_raw + d_raw
+        carmic2 = sum(int(d) for d in str(y_raw)) + sum(int(d) for d in str(m_raw)) + sum(int(d) for d in str(d_raw))
+        a0 = b_year + b_month + b_day
+        carmic3 = sum(int(d) for d in str(a0))
+        
+        carmic_0 = 0
+        for c in (carmic1, carmic2, carmic3):
+            if c in (13, 14, 16, 19):
+                carmic_0 = c
+                
+        carmic_str = str(carmic_0) if carmic_0 != 0 else "-"
+
+        # ★変更：Birth Numberのマスターナンバー（11, 22）判定
+        raw_birth = y_raw + m_raw + d_raw
+        
+        display_birth_num = self._reduce_to_single(raw_birth)
+        temp_val = raw_birth
+        while temp_val >= 10:
+            if temp_val in (11, 22):
+                display_birth_num = temp_val
+                break
+            temp_val = sum(int(digit) for digit in str(temp_val))
+
+        # 以降の計算用の変数（必ず1桁に還元）
+        y_num = self._reduce_to_single(y_raw)
+        m_num = self._reduce_to_single(b_month)
+        d_num = self._reduce_to_single(b_day)
+        birth_num = self._reduce_to_single(raw_birth)
+
         destiny_num = self._reduce_to_single(sum(self._get_name_number(c) for c in self.name))
         vowels = "aiueo"
         soul_num = self._reduce_to_single(sum(self._get_name_number(c) for c in self.name if c in vowels))
@@ -101,8 +136,9 @@ class NatalChart:
         
         self.results = {
             "BirthYear": b_year, "BirthMonth": b_month, "BirthDay": b_day,
-            "BirthNum": birth_num, "DestinyNum": destiny_num, "SoulNum": soul_num, "PersoNum": perso_num, "RealizNum": realiz_num,
+            "BirthNum": display_birth_num, "DestinyNum": destiny_num, "SoulNum": soul_num, "PersoNum": perso_num, "RealizNum": realiz_num,
             "StageNum": stage_num, "ChallNum": chall_num, "Strengths": strengths, "SubTheme": sub_theme,
+            "CarmicNum": carmic_str,
             "TP": [tp1, tp2, tp3], "Counts": counts,
             "MagicArray": magic_array, "NineBoxSums": nine_box_sums, "NineBoxMax": max_nine,
             "Stages": [
@@ -130,6 +166,7 @@ class NatalChart:
         lines.append(f"  Challenge Number   : {res['ChallNum']}")
         lines.append(f"  New Strength       : {res['Strengths']}")
         lines.append(f"  Hidden Theme       : {res['SubTheme']}")
+        lines.append(f"  Carmic Number      : {res['CarmicNum']}")
         lines.append("-" * 75)
         lines.append(" [ Turning Point Ages ]")
         lines.append(f"  1st Turning Point : {res['TP'][0]}")
@@ -205,7 +242,7 @@ class NatalChart:
         res = self.results
         
         data_left = [["Birth Number", res["BirthNum"]], ["Destiny Number", res["DestinyNum"]], ["Soul Number", res["SoulNum"]], ["Personality Number", res["PersoNum"]], ["Realization Number", res["RealizNum"]]]
-        data_right = [["Stage Number", res["StageNum"]], ["Challenge Number", res["ChallNum"]], ["New Strength", res["Strengths"]], ["Hidden Theme", res["SubTheme"]]]
+        data_right = [["Stage Number", res["StageNum"]], ["Challenge Number", res["ChallNum"]], ["New Strength", res["Strengths"]], ["Hidden Theme", res["SubTheme"]], ["Carmic Number", res["CarmicNum"]]]
         
         y_start = pdf.get_y()
         for item in data_left:
@@ -250,7 +287,6 @@ class NatalChart:
         
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(30, 7, "Term", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        # ★ ここを "Age Range" から "Age" に変更しました
         pdf.cell(40, 7, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C")
         pdf.cell(30, 7, "Milestone", border=1, new_x="RIGHT", new_y="TOP", align="C")
         pdf.cell(30, 7, "Rout", border=1, new_x="RIGHT", new_y="TOP", align="C")
@@ -541,11 +577,13 @@ if st.session_state.show_dashboard:
             
             st.write("") 
             
-            c6, c7, c8, c9 = st.columns(4)
+            # ★変更：カラムを5列にしてCarmic Numberを追加
+            c6, c7, c8, c9, c10 = st.columns(5)
             c6.metric("Stage Number", res["StageNum"])
             c7.metric("Challenge Number", res["ChallNum"])
             c8.metric("New Strength", res["Strengths"])
             c9.metric("Hidden Theme", res["SubTheme"])
+            c10.metric("Carmic Number", res["CarmicNum"])
 
             st.markdown('<div class="section-header">⌛ [ Turning Point Ages ]</div>', unsafe_allow_html=True)
             c1, c2, c3 = st.columns(3)
@@ -555,7 +593,6 @@ if st.session_state.show_dashboard:
 
             st.markdown('<div class="section-header">📅 [ Life Cycle Stages ]</div>', unsafe_allow_html=True)
             df_stages = pd.DataFrame(res["Stages"])
-            # ★ ここを "Age Range" から "Age" に変更しました
             df_stages.columns = ["Term", "Age", "Milestone", "Rout", "Hardships"]
             
             styled_stages = df_stages.style.set_properties(**{'text-align': 'center'}) \
