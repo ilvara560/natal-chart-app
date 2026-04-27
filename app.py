@@ -501,8 +501,14 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
+# ★追加：Streamlit特有のメニューやヘッダーを隠すCSS
 st.markdown("""
 <style>
+/* 右上のメニュー、ヘッダー（Deployボタン）、フッター（Made with Streamlit）を隠す */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
     border: 1px solid var(--border-color);
