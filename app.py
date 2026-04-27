@@ -502,7 +502,6 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
-# ★Streamlit特有のメニューやヘッダーを隠すCSS
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
@@ -554,16 +553,18 @@ with st.form("input_form"):
     with col1:
         name_in = st.text_input("Name (e.g., Goro Sakamaki)", value="Goro Sakamaki")
     with col2:
-        birth_in = st.text_input("Birthday (YYYYMMDD)", value="19710625")
+        # ★変更：カレンダーUI（Date Picker）の導入
+        birth_date = st.date_input("Birthday", value=datetime(1971, 6, 25), min_value=datetime(1900, 1, 1))
+        # カレンダーから取得した日付を、アルゴリズム側が求める8桁の文字列（YYYYMMDD）に自動変換
+        birth_in = birth_date.strftime("%Y%m%d")
     
     submitted = st.form_submit_button("Generate Dashboard")
 
-# バリデーション（入力値の不正チェック）機能
 if submitted:
     if not re.match(r'^[a-zA-Z\s]+$', name_in):
         st.error("エラー: 氏名はローマ字（アルファベット）のみで入力してください。")
     elif len(birth_in) != 8 or not birth_in.isdigit():
-        st.error("エラー: 生年月日は8桁の半角数字（例: 19710625）で入力してください。")
+        st.error("エラー: 生年月日は正しく入力してください。")
     else:
         st.session_state.show_dashboard = True
         st.session_state.ai_reading = None
@@ -783,7 +784,6 @@ if st.session_state.show_dashboard:
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
-# ★変更：フッターにクレジットとプライバシーポリシーへのリンクを追加
 st.markdown("""
 <div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px;">
     Navigated by Nabi<br>
