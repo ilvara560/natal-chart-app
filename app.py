@@ -774,6 +774,6 @@ if st.session_state.show_dashboard:
 # フッターにクレジットを追加
 st.markdown("""
 <div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px;">
-    Powered by Gorogonzola
+    Navigated by Nabi
 </div>
 """, unsafe_allow_html=True)
