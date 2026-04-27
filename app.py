@@ -513,29 +513,32 @@ st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
 st.markdown("""
 <style>
-/* ヘッダー、フッター、メニューを領域ごと完全に隠す */
+/* 右上のメニュー、ヘッダー、デフォルトフッターを隠す */
 #MainMenu {display: none !important; visibility: hidden !important;}
 header {display: none !important; visibility: hidden !important;}
 footer {display: none !important; visibility: hidden !important;}
 [data-testid="stHeader"] {display: none !important; visibility: hidden !important;}
 [data-testid="stFooter"] {display: none !important; visibility: hidden !important;}
+[data-testid="stBottom"] {display: none !important; visibility: hidden !important;}
 
-/* ★ embed=true 時に下部に出現する Built with Streamlit バーを完全消去 */
+/* ★ 今回のターゲット：?embed=true 時に下部に出現する「Built with Streamlit / Fullscreen」のグレー帯を完全消去 */
+.stEmbedFooter {display: none !important; visibility: hidden !important; opacity: 0 !important;}
 [data-testid="stEmbedFooter"] {display: none !important; visibility: hidden !important; opacity: 0 !important;}
+[data-testid="stBottomBlock"] {display: none !important; visibility: hidden !important; opacity: 0 !important;}
+div:has(a[href*="streamlit.io"]) {display: none !important; visibility: hidden !important;}
+div:has(> a[href*="streamlit.io"]) {display: none !important; visibility: hidden !important;}
 
-/* クラウド右下のフローティングアイコン（赤・緑など）をあらゆるパターンで強制非表示 */
+/* 念のためクラウド右下のフローティングアイコン（赤や緑のバッジ）も防ぐ */
 .stDeployButton {display: none !important;}
 [data-testid="manage-app-button"] {display: none !important;}
 [data-testid="stToolbar"] {display: none !important;}
 [data-testid="stDecoration"] {display: none !important;}
 [data-testid="stStatusWidget"] {display: none !important;}
-[class^="viewerBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
-[class*="viewerBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
+[class^="viewerBadge"] {display: none !important; visibility: hidden !important;}
+[class*="viewerBadge"] {display: none !important; visibility: hidden !important;}
 [class^="manageAppBadge"] {display: none !important; visibility: hidden !important;}
 [class*="manageAppBadge"] {display: none !important; visibility: hidden !important;}
-a[href^="https://streamlit.io/cloud"] {display: none !important; visibility: hidden !important;}
-div[title="View app details"] {display: none !important; visibility: hidden !important;}
-div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
+div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important; visibility: hidden !important; pointer-events: none !important;}
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
