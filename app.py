@@ -513,12 +513,17 @@ st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
 st.markdown("""
 <style>
-/* 右上のメニュー、ヘッダー、フッターを隠す */
-#MainMenu {visibility: hidden !important;}
-header {visibility: hidden !important;}
-footer {visibility: hidden !important;}
+/* ヘッダー、フッター、メニューを領域ごと完全に隠す */
+#MainMenu {display: none !important; visibility: hidden !important;}
+header {display: none !important; visibility: hidden !important;}
+footer {display: none !important; visibility: hidden !important;}
+[data-testid="stHeader"] {display: none !important; visibility: hidden !important;}
+[data-testid="stFooter"] {display: none !important; visibility: hidden !important;}
 
-/* ★右下のフローティングアイコン（Streamlit Cloud特有）をあらゆるパターンで強制非表示にする究極のCSS */
+/* ★ embed=true 時に下部に出現する Built with Streamlit バーを完全消去 */
+[data-testid="stEmbedFooter"] {display: none !important; visibility: hidden !important; opacity: 0 !important;}
+
+/* クラウド右下のフローティングアイコン（赤・緑など）をあらゆるパターンで強制非表示 */
 .stDeployButton {display: none !important;}
 [data-testid="manage-app-button"] {display: none !important;}
 [data-testid="stToolbar"] {display: none !important;}
@@ -530,7 +535,6 @@ footer {visibility: hidden !important;}
 [class*="manageAppBadge"] {display: none !important; visibility: hidden !important;}
 a[href^="https://streamlit.io/cloud"] {display: none !important; visibility: hidden !important;}
 div[title="View app details"] {display: none !important; visibility: hidden !important;}
-/* 画面の右下（bottom/right）に固定(fixed)されている怪しいdivを根こそぎ透明化 */
 div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
 
 div[data-testid="metric-container"] {
