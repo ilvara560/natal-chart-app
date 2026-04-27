@@ -513,9 +513,17 @@ st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
 st.markdown("""
 <style>
+/* 右上のメニュー、ヘッダー、フッターを隠す */
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
 footer {visibility: hidden;}
+
+/* 右下のフローティングアイコン（Streamlit Cloud特有）を強制非表示 */
+.stDeployButton {display: none !important;}
+[data-testid="stToolbar"] {display: none !important;}
+[data-testid="stDecoration"] {display: none !important;}
+[data-testid="stStatusWidget"] {display: none !important;}
+[class^="viewerBadge"] {display: none !important;}
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
@@ -562,7 +570,13 @@ with st.form("input_form"):
     with col1:
         name_in = st.text_input("Name (e.g., Goro Sakamaki)", value="Goro Sakamaki")
     with col2:
-        birth_date = st.date_input("Birthday", value=datetime(1971, 6, 25), min_value=datetime(1900, 1, 1))
+        # ★変更：カレンダーUI範囲（100年前の元旦〜今年の年末）の設定
+        JST = timezone(timedelta(hours=+9), 'JST')
+        current_year = datetime.now(JST).year
+        min_date = datetime(current_year - 100, 1, 1).date()
+        max_date = datetime(current_year, 12, 31).date()
+            
+        birth_date = st.date_input("Birthday", value=datetime(1971, 6, 25), min_value=min_date, max_value=max_date)
         birth_in = birth_date.strftime("%Y%m%d")
     
     submitted = st.form_submit_button("Generate Dashboard")
@@ -584,7 +598,6 @@ if st.session_state.show_dashboard:
             res = chart.results
             c = res["Counts"]
             
-            # ★ 変更箇所：アコーディオンのアイコンを削除
             with st.expander("Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
@@ -733,7 +746,6 @@ if st.session_state.show_dashboard:
             try:
                 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 
-                # ★ 変更箇所：生成ボタンのアイコンを削除
                 if st.button("Generate Reading"):
                     try:
                         with open("prompt_template.txt", "r", encoding="utf-8") as f:
@@ -787,7 +799,6 @@ if st.session_state.show_dashboard:
             except Exception as e: st.error(f"不明なエラー: {e}")
             
             if st.session_state.get("ai_reading"):
-                # ★ 変更箇所：完了メッセージのアイコンを削除
                 st.success("鑑定書の生成が完了しました！")
                 formatted_html = ""
                 for line in st.session_state.ai_reading.split('\n'):
@@ -809,7 +820,6 @@ if st.session_state.show_dashboard:
                 ai_text = st.session_state.get("ai_reading", None)
                 chart.export_graphical_pdf(pdf_filename, ai_text=ai_text)
                 with open(pdf_filename, "rb") as pdf_file:
-                    # ★ 変更箇所：PDFダウンロードボタンのアイコンを削除
                     st.download_button(label="Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
