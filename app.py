@@ -584,10 +584,10 @@ if st.session_state.show_dashboard:
             res = chart.results
             c = res["Counts"]
             
-            with st.expander("📄 Show Original Text Report Format", expanded=False):
+            # ★ 変更箇所：アコーディオンのアイコンを削除
+            with st.expander("Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
-            # ★ 変更箇所：ここから下の section-header からアイコン（絵文字）を削除
             st.markdown('<div class="section-header">[ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
             
             c1, c2, c3, c4, c5 = st.columns(5)
@@ -733,7 +733,8 @@ if st.session_state.show_dashboard:
             try:
                 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
 
-                if st.button("✨ Generate Reading"):
+                # ★ 変更箇所：生成ボタンのアイコンを削除
+                if st.button("Generate Reading"):
                     try:
                         with open("prompt_template.txt", "r", encoding="utf-8") as f:
                             template_text = f.read()
@@ -786,7 +787,8 @@ if st.session_state.show_dashboard:
             except Exception as e: st.error(f"不明なエラー: {e}")
             
             if st.session_state.get("ai_reading"):
-                st.success("✨ 鑑定書の生成が完了しました！")
+                # ★ 変更箇所：完了メッセージのアイコンを削除
+                st.success("鑑定書の生成が完了しました！")
                 formatted_html = ""
                 for line in st.session_state.ai_reading.split('\n'):
                     line = line.strip()
@@ -807,7 +809,8 @@ if st.session_state.show_dashboard:
                 ai_text = st.session_state.get("ai_reading", None)
                 chart.export_graphical_pdf(pdf_filename, ai_text=ai_text)
                 with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button(label="📄 Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
+                    # ★ 変更箇所：PDFダウンロードボタンのアイコンを削除
+                    st.download_button(label="Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
