@@ -514,16 +514,22 @@ st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 st.markdown("""
 <style>
 /* 右上のメニュー、ヘッダー、フッターを隠す */
-#MainMenu {visibility: hidden;}
-header {visibility: hidden;}
-footer {visibility: hidden;}
+#MainMenu {visibility: hidden !important;}
+header {visibility: hidden !important;}
+footer {visibility: hidden !important;}
 
-/* 右下のフローティングアイコン（Streamlit Cloud特有）を強制非表示 */
+/* ★右下のフローティングアイコン（Streamlit Cloud特有）をあらゆるパターンで強制非表示 */
 .stDeployButton {display: none !important;}
+[data-testid="manage-app-button"] {display: none !important;}
 [data-testid="stToolbar"] {display: none !important;}
 [data-testid="stDecoration"] {display: none !important;}
 [data-testid="stStatusWidget"] {display: none !important;}
 [class^="viewerBadge"] {display: none !important;}
+[class*="viewerBadge"] {display: none !important;}
+[class^="manageAppBadge"] {display: none !important;}
+[class*="manageAppBadge"] {display: none !important;}
+a[href^="https://streamlit.io/cloud"] {display: none !important;}
+div[title="View app details"] {display: none !important;}
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
@@ -570,7 +576,6 @@ with st.form("input_form"):
     with col1:
         name_in = st.text_input("Name (e.g., Goro Sakamaki)", value="Goro Sakamaki")
     with col2:
-        # ★変更：カレンダーUI範囲（100年前の元旦〜今年の年末）の設定
         JST = timezone(timedelta(hours=+9), 'JST')
         current_year = datetime.now(JST).year
         min_date = datetime(current_year - 100, 1, 1).date()
