@@ -518,18 +518,20 @@ st.markdown("""
 header {visibility: hidden !important;}
 footer {visibility: hidden !important;}
 
-/* ★右下のフローティングアイコン（Streamlit Cloud特有）をあらゆるパターンで強制非表示 */
+/* ★右下のフローティングアイコン（Streamlit Cloud特有）をあらゆるパターンで強制非表示にする究極のCSS */
 .stDeployButton {display: none !important;}
 [data-testid="manage-app-button"] {display: none !important;}
 [data-testid="stToolbar"] {display: none !important;}
 [data-testid="stDecoration"] {display: none !important;}
 [data-testid="stStatusWidget"] {display: none !important;}
-[class^="viewerBadge"] {display: none !important;}
-[class*="viewerBadge"] {display: none !important;}
-[class^="manageAppBadge"] {display: none !important;}
-[class*="manageAppBadge"] {display: none !important;}
-a[href^="https://streamlit.io/cloud"] {display: none !important;}
-div[title="View app details"] {display: none !important;}
+[class^="viewerBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
+[class*="viewerBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
+[class^="manageAppBadge"] {display: none !important; visibility: hidden !important;}
+[class*="manageAppBadge"] {display: none !important; visibility: hidden !important;}
+a[href^="https://streamlit.io/cloud"] {display: none !important; visibility: hidden !important;}
+div[title="View app details"] {display: none !important; visibility: hidden !important;}
+/* 画面の右下（bottom/right）に固定(fixed)されている怪しいdivを根こそぎ透明化 */
+div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
