@@ -3,7 +3,7 @@ import sys
 import json
 import urllib.request
 import urllib.error
-import re  # ★追加：入力文字のチェック（正規表現）を行うためのモジュール
+import re  
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timezone, timedelta
@@ -502,10 +502,9 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
-# ★追加：Streamlit特有のメニューやヘッダーを隠すCSS
+# ★Streamlit特有のメニューやヘッダーを隠すCSS
 st.markdown("""
 <style>
-/* 右上のメニュー、ヘッダー（Deployボタン）、フッター（Made with Streamlit）を隠す */
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
 footer {visibility: hidden;}
@@ -559,12 +558,10 @@ with st.form("input_form"):
     
     submitted = st.form_submit_button("Generate Dashboard")
 
-# ★変更：バリデーション（入力値の不正チェック）機能を追加
+# バリデーション（入力値の不正チェック）機能
 if submitted:
-    # 氏名がローマ字（アルファベット）とスペースのみで構成されているかを判定
     if not re.match(r'^[a-zA-Z\s]+$', name_in):
         st.error("エラー: 氏名はローマ字（アルファベット）のみで入力してください。")
-    # 生年月日がぴったり8桁の数字であるかを判定
     elif len(birth_in) != 8 or not birth_in.isdigit():
         st.error("エラー: 生年月日は8桁の半角数字（例: 19710625）で入力してください。")
     else:
@@ -786,9 +783,10 @@ if st.session_state.show_dashboard:
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
-# フッターにクレジットを追加
+# ★変更：フッターにクレジットとプライバシーポリシーへのリンクを追加
 st.markdown("""
 <div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px;">
-    Navigated by Nabi
+    Navigated by Nabi<br>
+    <a href="https://sites.google.com/view/natalchart/privacy-policy" target="_blank" style="color: gray; text-decoration: underline;">Privacy Policy</a>
 </div>
 """, unsafe_allow_html=True)
