@@ -537,7 +537,7 @@ table th, table td {
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Natal Chart Web Dashboard")
+st.title("Natal Chart Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
 
 if "show_dashboard" not in st.session_state:
