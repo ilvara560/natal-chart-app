@@ -587,7 +587,8 @@ if st.session_state.show_dashboard:
             with st.expander("📄 Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
-            st.markdown('<div class="section-header">🧩 [ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
+            # ★ 変更箇所：ここから下の section-header からアイコン（絵文字）を削除
+            st.markdown('<div class="section-header">[ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
             
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("Birth Number", res["BirthNum"])
@@ -605,13 +606,13 @@ if st.session_state.show_dashboard:
             c9.metric("Hidden Theme", res["SubTheme"])
             c10.metric("Carmic Number", res["CarmicNum"])
 
-            st.markdown('<div class="section-header">⌛ [ Turning Point Ages ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">[ Turning Point Ages ]</div>', unsafe_allow_html=True)
             c1, c2, c3 = st.columns(3)
             c1.metric("1st Turning Point", f"{res['TP'][0]} yrs")
             c2.metric("2nd Turning Point (Main)", f"{res['TP'][1]} yrs")
             c3.metric("3rd Turning Point", f"{res['TP'][2]} yrs")
 
-            st.markdown('<div class="section-header">📅 [ Life Cycle Stages ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">[ Life Cycle Stages ]</div>', unsafe_allow_html=True)
             df_stages = pd.DataFrame(res["Stages"])
             df_stages.columns = ["Term", "Age", "Milestone", "Rout", "Hardships"]
             
@@ -620,7 +621,7 @@ if st.session_state.show_dashboard:
                 .hide(axis="index")
             st.table(styled_stages)
             
-            st.markdown('<div class="section-header">🔮 [ Nine Box ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">[ Nine Box ]</div>', unsafe_allow_html=True)
             
             col_box, col_sums = st.columns([1, 1])
             with col_box:
@@ -688,7 +689,7 @@ if st.session_state.show_dashboard:
                 sum_html += "</table>"
                 st.markdown(sum_html, unsafe_allow_html=True)
 
-            st.markdown('<div class="section-header">🌊 [ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">[ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
             
             cycle_keywords = {
                 1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
@@ -726,7 +727,7 @@ if st.session_state.show_dashboard:
             with col_c: st.table(style_cycles(create_cycle_df(54, 81)))
 
             # --- 4. Personalized Reading ---
-            st.markdown('<div class="section-header">🤖 [ Personalized Reading ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">[ Personalized Reading ]</div>', unsafe_allow_html=True)
             st.write("上記の結果に基づいたあなた専用のパーソナライズされた鑑定書を生成します。")
 
             try:
@@ -800,7 +801,7 @@ if st.session_state.show_dashboard:
                 st.markdown(f"""<div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">{formatted_html}</div>""", unsafe_allow_html=True)
 
             # --- PDF Export セクション ---
-            st.markdown('<div class="section-header">📥 [ Export Report ]</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-header">[ Export Report ]</div>', unsafe_allow_html=True)
             if HAS_FPDF:
                 pdf_filename = f"{name_in.replace(' ', '_')}_Graphical.pdf"
                 ai_text = st.session_state.get("ai_reading", None)
