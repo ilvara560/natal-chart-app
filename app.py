@@ -15,18 +15,29 @@ except ImportError:
     HAS_FPDF = False
 
 # ==========================================
-# 1. API呼び出し関数（キャッシュ機能付き）
+# 1. API呼び出し関数（ストリーミング対応版に変更）
 # ==========================================
-@st.cache_data(show_spinner=False)
-def get_gemini_reading(api_key, model, prompt):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+def get_gemini_reading_stream(api_key, model, prompt):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
     
     with urllib.request.urlopen(req) as response:
-        result = json.loads(response.read().decode('utf-8'))
-        raw_text = result['candidates'][0]['content']['parts'][0]['text']
-        return raw_text.replace('*', '')
+        for line in response:
+            line = line.decode('utf-8').strip()
+            if line.startswith("data: "):
+                data_str = line[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk_json = json.loads(data_str)
+                    if "candidates" in chunk_json and len(chunk_json["candidates"]) > 0:
+                        parts = chunk_json["candidates"][0].get("content", {}).get("parts", [])
+                        if parts:
+                            chunk_text = parts[0].get("text", "")
+                            yield chunk_text.replace('*', '')
+                except json.JSONDecodeError:
+                    pass
 
 # ==========================================
 # ロジック・テキスト出力・PDF出力
@@ -64,15 +75,13 @@ class NatalChart:
         m_raw = (b_month // 10) + (b_month % 10)      # 月の各桁の和
         d_raw = (b_day // 10) + (b_day % 10)          # 日の各桁の和
 
-        # ★ Carmic Number の算出 (VBA 818-841行目)
+        # ★ Carmic Number の算出
         carmic1 = y_raw + m_raw + d_raw               # 全桁の単純合算
         
-        # carmic2: 各項目の和をさらに10の位と1の位に分けて足す
         def vba_reduce_once(n):
             return (n // 10) + (n % 10)
         carmic2 = vba_reduce_once(y_raw) + vba_reduce_once(m_raw) + vba_reduce_once(d_raw)
         
-        # carmic3: YYYY+MM+DD の合計値の全桁和
         a0 = b_year + b_month + b_day
         carmic3 = sum(int(d) for d in str(a0))
         
@@ -82,7 +91,7 @@ class NatalChart:
                 carmic_0 = c
         carmic_str = str(carmic_0) if carmic_0 != 0 else "-"
 
-        # ★ Birth Number のマスターナンバー判定 (VBA 857-862行目)
+        # ★ Birth Number のマスターナンバー判定
         raw_birth = y_raw + m_raw + d_raw
         display_birth_num = self._reduce_to_single(raw_birth)
         temp_val = raw_birth
@@ -553,9 +562,7 @@ with st.form("input_form"):
     with col1:
         name_in = st.text_input("Name (e.g., Goro Sakamaki)", value="Goro Sakamaki")
     with col2:
-        # ★変更：カレンダーUI（Date Picker）の導入
         birth_date = st.date_input("Birthday", value=datetime(1971, 6, 25), min_value=datetime(1900, 1, 1))
-        # カレンダーから取得した日付を、アルゴリズム側が求める8桁の文字列（YYYYMMDD）に自動変換
         birth_in = birth_date.strftime("%Y%m%d")
     
     submitted = st.form_submit_button("Generate Dashboard")
@@ -743,9 +750,28 @@ if st.session_state.show_dashboard:
                     )
                     selected_model = "gemini-2.5-flash"
 
-                    with st.spinner("鑑定書を作成しています... (数秒お待ちください)"):
+                    with st.spinner("鑑定士 N a b i が言葉を紡いでいます..."):
+                        placeholder = st.empty()
+                        full_text = ""
                         try:
-                            st.session_state.ai_reading = get_gemini_reading(api_key, selected_model, prompt)
+                            for chunk in get_gemini_reading_stream(api_key, selected_model, prompt):
+                                full_text += chunk
+                                
+                                temp_html = ""
+                                for line in full_text.split('\n'):
+                                    line = line.strip()
+                                    if not line:
+                                        temp_html += "<div style='height: 12px;'></div>"
+                                        continue
+                                    if line.startswith('#'):
+                                        title_text = line.lstrip('#').strip()
+                                        temp_html += f"<div style='color: #4a90e2; font-size: 1.3em; font-weight: 600; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;'>{title_text}</div>"
+                                    else:
+                                        temp_html += f"<div style='margin-bottom: 8px;'>{line}</div>"
+                                placeholder.markdown(f"""<div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">{temp_html}</div>""", unsafe_allow_html=True)
+                                
+                            st.session_state.ai_reading = full_text
+                            placeholder.empty()
                         except urllib.error.HTTPError as e:
                             try:
                                 error_details = e.read().decode('utf-8')
