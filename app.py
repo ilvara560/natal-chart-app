@@ -511,37 +511,55 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
+# =========================================================================
+# ★【完全決着】WebViewエラー要因を一切含まない、もっとも強力で安全なCSS
+# =========================================================================
 st.markdown("""
 <style>
-/* ========================================================
-   ★iOS/WebViewで絶対にエラーにならない最強のシンプルCSS
-   ※エラーの原因となる :has() や JavaScriptハックを完全排除
-   ======================================================== */
-/* 1. 標準のヘッダー・フッター・メニューを隠す */
-header { visibility: hidden !important; display: none !important; }
-footer { visibility: hidden !important; display: none !important; }
-#MainMenu { visibility: hidden !important; display: none !important; }
-[data-testid="stHeader"] { display: none !important; }
-[data-testid="stFooter"] { display: none !important; }
-[data-testid="stBottom"] { display: none !important; }
-[data-testid="stBottomBlock"] { display: none !important; }
+/* --- 1. 標準ヘッダー・フッター --- */
+header, footer, #MainMenu, [data-testid="stHeader"], [data-testid="stFooter"] { 
+    display: none !important; 
+    visibility: hidden !important; 
+    height: 0 !important; 
+}
 
-/* 2. 埋め込み時のグレー帯を隠す */
-.stEmbedFooter { display: none !important; }
-[data-testid="stEmbedFooter"] { display: none !important; }
+/* --- 2. クラウドのバッジ要素（赤/緑アイコン）をクラス名や属性で完全非表示 --- */
+[class*="viewerBadge"], 
+[class*="manageAppBadge"], 
+[class^="viewerBadge"], 
+[class^="manageAppBadge"] { 
+    display: none !important; 
+    visibility: hidden !important; 
+    opacity: 0 !important; 
+    pointer-events: none !important; 
+    z-index: -9999 !important; 
+}
+[data-testid="manage-app-button"], .stDeployButton { 
+    display: none !important; 
+}
 
-/* 3. クラウド特有の赤・緑のフローティングボタンを消去（シンプル指定） */
-.stDeployButton { display: none !important; }
-[data-testid="manage-app-button"] { display: none !important; }
-div[class*="viewerBadge"] { display: none !important; opacity: 0 !important; pointer-events: none !important;}
-div[class*="manageAppBadge"] { display: none !important; opacity: 0 !important; pointer-events: none !important;}
+/* --- 3. Streamlitドメインへ飛ぶリンク(aタグ)を見えなくする --- */
+a[href*="streamlit.io"] { 
+    display: none !important; 
+    visibility: hidden !important; 
+    opacity: 0 !important; 
+    pointer-events: none !important; 
+}
 
-/* 4. Streamlitへのリンク文字を隠す */
-a[href*="streamlit.io"] { display: none !important; pointer-events: none !important; }
-    
-/* 5. 余白の調整 */
-.block-container { padding-bottom: 1rem !important; }
-/* ======================================================== */
+/* --- 4. クラウドが付与する z-index: 99999X のコンテナを狙い撃ち --- */
+div[style*="z-index: 999990"], 
+div[style*="z-index: 999991"], 
+div[style*="z-index: 99999"] { 
+    display: none !important; 
+    visibility: hidden !important; 
+    pointer-events: none !important; 
+}
+
+/* --- 5. 画面下部の無駄な余白を詰める --- */
+.block-container { 
+    padding-bottom: 1rem !important; 
+}
+/* ========================================================================= */
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
@@ -576,6 +594,7 @@ table th, table td {
 }
 </style>
 """, unsafe_allow_html=True)
+# =========================================================================
 
 st.title("Natal Chart Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
