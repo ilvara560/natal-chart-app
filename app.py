@@ -511,36 +511,54 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
+# =========================================================================
+# ★【完全決着】WebViewエラー要因を一切含まない、もっとも強力で安全なCSS
+# =========================================================================
 st.markdown("""
 <style>
-/* 1. 標準ヘッダー・フッター・メニューを確実に隠す */
+/* 1. 標準のヘッダー・フッター・メニューを確実に隠す */
 header { visibility: hidden !important; display: none !important; }
 footer { visibility: hidden !important; display: none !important; }
 #MainMenu { visibility: hidden !important; display: none !important; }
+.stApp > header { display: none !important; }
+.stApp > footer { display: none !important; }
 [data-testid="stHeader"] { display: none !important; }
 [data-testid="stFooter"] { display: none !important; }
 
-/* 2. 埋め込み時(embed=true)に出現する帯（stBottom等）を確実に隠す */
-[data-testid="stBottom"] { display: none !important; height: 0 !important; }
-[data-testid="stEmbedFooter"] { display: none !important; height: 0 !important; }
-[data-testid="stBottomBlock"] { display: none !important; height: 0 !important; }
-
-/* 3. 「Built with Streamlit」や「Fullscreen」のリンクそのものを消滅させる */
-a[href^="https://streamlit.io"] { display: none !important; visibility: hidden !important; }
-a[title="Fullscreen"] { display: none !important; visibility: hidden !important; }
-svg[title="Fullscreen"] { display: none !important; visibility: hidden !important; }
-button[title="Fullscreen"] { display: none !important; visibility: hidden !important; }
-
-/* 4. クラウド特有の赤・緑のフローティングボタンを消去 */
+/* 2. クラウド特有の赤・緑のフローティングボタンをクラス名や属性で完全非表示 */
 .stDeployButton { display: none !important; }
 [data-testid="manage-app-button"] { display: none !important; }
-[class^="viewerBadge"] { display: none !important; }
-[class*="viewerBadge"] { display: none !important; }
-[class^="manageAppBadge"] { display: none !important; }
-[class*="manageAppBadge"] { display: none !important; }
+[class^="viewerBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
+[class*="viewerBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
+[class^="manageAppBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
+[class*="manageAppBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
 
-/* 5. 画面下部にできる無駄な余白を完全に詰める */
+/* 3. 画面下部に固定される要素（グレーの帯やBuilt with等の親枠）を座標から狙い撃ちして強制消去 */
+div[style*="position: fixed"][style*="bottom"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
+div[style*="position: absolute"][style*="bottom"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
+
+/* 4. Streamlitへのリンク文字（Built with Streamlit等）とFullscreenボタンを隠す */
+a[href*="streamlit.io"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
+a[title="Fullscreen"] { display: none !important; }
+svg[title="Fullscreen"] { display: none !important; }
+button[title="Fullscreen"] { display: none !important; }
+[data-testid="stBottom"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+[data-testid="stEmbedFooter"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
+
+/* 5. 画面下部の無駄な余白を完全に詰める */
 .block-container { padding-bottom: 1rem !important; margin-bottom: 0rem !important; }
+
+/* --- 6. ★ Privacy PolicyボタンをNavigated by Nabiと全く同じ文字サイズ・色・フォントにする --- */
+button[kind="tertiary"], button[kind="tertiary"] p {
+    color: gray !important;
+    font-size: 12px !important;
+    font-weight: normal !important;
+    font-family: inherit !important;
+}
+button[kind="tertiary"]:hover p {
+    text-decoration: underline !important;
+}
+/* ========================================================================= */
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
@@ -575,6 +593,19 @@ table th, table td {
 }
 </style>
 """, unsafe_allow_html=True)
+# =========================================================================
+
+# ★ 追加箇所：プライバシーポリシーをフワッと表示するダイアログ（ポップアップ）機能
+@st.dialog("Privacy Policy")
+def show_privacy_policy():
+    try:
+        # app.py と同じフォルダにある privacy_policy.txt を読み込む
+        with open("privacy_policy.txt", "r", encoding="utf-8") as f:
+            policy_text = f.read()
+        st.markdown(policy_text)
+    except FileNotFoundError:
+        st.error("プライバシーポリシーのファイルが見つかりません。")
+        st.info("app.py と同じフォルダに「privacy_policy.txt」という名前のテキストファイルを作成して文章を保存してください。")
 
 st.title("Natal Chart Dashboard")
 st.write("Enter your details below to generate a comprehensive Numerology analysis.")
@@ -840,10 +871,14 @@ if st.session_state.show_dashboard:
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
-# ★ 変更箇所：リンクのスタイルを Navigated by Nabi と完全に同化
+# ★ 変更箇所：リンクではなく、ボタンを押すとテキストファイルの内容をダイアログ表示する実装
 st.markdown("""
-<div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px; font-family: inherit; font-weight: normal;">
-    Navigated by Nabi<br>
-    <a href="https://sites.google.com/view/natalchartprivacypolicy/%E3%83%9B%E3%83%BC%E3%83%A0" target="_blank" rel="noopener noreferrer" style="color: gray; text-decoration: none; font-size: 12px; font-family: inherit; font-weight: normal; pointer-events: auto;">Privacy Policy</a>
+<div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px; margin-bottom: 10px;">
+    Navigated by Nabi
 </div>
 """, unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    if st.button("Privacy Policy", type="tertiary", use_container_width=True):
+        show_privacy_policy()
