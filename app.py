@@ -863,6 +863,6 @@ if st.session_state.show_dashboard:
 st.markdown("""
 <div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px;">
     Navigated by Nabi<br>
-    <a href="https://sites.google.com/view/natalchartprivacypolicy/%E3%83%9B%E3%83%BC%E3%83%A0" target="_blank" style="color: gray; text-decoration: underline;">Privacy Policy</a>
+    <a href="https://sites.google.com/view/natalchartprivacypolicy/%E3%83%9B%E3%83%BC%E3%83%A0" style="color: gray; text-decoration: underline;">Privacy Policy</a>
 </div>
 """, unsafe_allow_html=True)
