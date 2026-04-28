@@ -5,6 +5,7 @@ import urllib.request
 import urllib.error
 import re  
 import streamlit as st
+import streamlit.components.v1 as components  # ★追加：DOMを強制操作するためのコンポーネント
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 
@@ -511,37 +512,61 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
+# =========================================================================
+# ★【最終兵器】JavaScriptを使用して、Streamlitクラウドの親DOMを直接書き換え、帯を強制排除
+# =========================================================================
+components.html(
+    """
+    <script>
+    const parentDoc = window.parent.document;
+    if (!parentDoc.getElementById('nuke-streamlit-watermarks')) {
+        const style = parentDoc.createElement('style');
+        style.id = 'nuke-streamlit-watermarks';
+        style.innerHTML = `
+            footer {display: none !important; visibility: hidden !important;}
+            header {display: none !important; visibility: hidden !important;}
+            [data-testid="stEmbedFooter"] {display: none !important; visibility: hidden !important; opacity: 0 !important; height: 0px !important;}
+            [data-testid="stBottom"] {display: none !important; visibility: hidden !important; opacity: 0 !important; height: 0px !important;}
+            [data-testid="stBottomBlock"] {display: none !important; visibility: hidden !important; opacity: 0 !important; height: 0px !important;}
+            [data-testid="manage-app-button"] {display: none !important; visibility: hidden !important;}
+            .stDeployButton {display: none !important; visibility: hidden !important;}
+            [class*="viewerBadge"] {display: none !important; visibility: hidden !important;}
+            [class*="manageAppBadge"] {display: none !important; visibility: hidden !important;}
+        `;
+        parentDoc.head.appendChild(style);
+    }
+    </script>
+    """,
+    height=0,
+    width=0
+)
+# =========================================================================
+
 st.markdown("""
 <style>
-/* 1. デフォルトのヘッダー・フッターを完全に消去 */
-header {visibility: hidden !important; display: none !important;}
-footer {visibility: hidden !important; display: none !important;}
-#MainMenu {visibility: hidden !important; display: none !important;}
+/* 既存の非表示用CSS（二重でブロックします） */
+#MainMenu {display: none !important;}
+header {display: none !important;}
+footer {display: none !important;}
+[data-testid="stHeader"] {display: none !important;}
+[data-testid="stFooter"] {display: none !important;}
+[data-testid="stBottom"] {display: none !important;}
+.stEmbedFooter {display: none !important;}
+[data-testid="stEmbedFooter"] {display: none !important;}
+[data-testid="stBottomBlock"] {display: none !important;}
+div:has(a[href*="streamlit.io"]) {display: none !important;}
+div:has(> a[href*="streamlit.io"]) {display: none !important;}
+.stDeployButton {display: none !important;}
+[data-testid="manage-app-button"] {display: none !important;}
+[data-testid="stToolbar"] {display: none !important;}
+[class^="viewerBadge"] {display: none !important;}
+[class*="viewerBadge"] {display: none !important;}
+[class^="manageAppBadge"] {display: none !important;}
+[class*="manageAppBadge"] {display: none !important;}
+div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important;}
 
-/* 2. 埋め込み時の「Built with Streamlit / Fullscreen」グレー帯を消去 */
-[data-testid="stEmbedFooter"] {visibility: hidden !important; display: none !important;}
-.stEmbedFooter {visibility: hidden !important; display: none !important;}
-
-/* 3. クラウド特有の赤・緑のフローティングボタン（Created by / Hosted with Streamlit）を消去 */
-.stAppDeployButton {display: none !important; visibility: hidden !important;}
-[data-testid="stAppDeployButton"] {display: none !important; visibility: hidden !important;}
-[data-testid="manage-app-button"] {display: none !important; visibility: hidden !important;}
-[data-testid="stToolbar"] {display: none !important; visibility: hidden !important;}
-[class^="viewerBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
-[class*="viewerBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
-[class^="manageAppBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
-[class*="manageAppBadge"] {display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important;}
-
-/* 4. Streamlitへのリンクを含むコンテナをすべて非表示にする究極指定 */
-a[href*="streamlit.io"] {display: none !important; visibility: hidden !important;}
-div:has(> a[href*="streamlit.io"]) {display: none !important; visibility: hidden !important;}
-
-/* 5. 画面の右下や下部に固定されている要素を、親要素ごと強制的に消去（絨毯爆撃） */
-div[style*="position: fixed"][style*="bottom"] {display: none !important; visibility: hidden !important; pointer-events: none !important;}
-div[style*="position: absolute"][style*="bottom"] {display: none !important; visibility: hidden !important; pointer-events: none !important;}
-
-/* 6. 最下部の余白を詰める */
-.block-container {padding-bottom: 0rem !important;}
+/* アプリ最下部の無駄なスクロール領域をゼロにする */
+.block-container {padding-bottom: 0rem !important; margin-bottom: 0rem !important;}
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
