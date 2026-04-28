@@ -514,31 +514,53 @@ st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 st.markdown("""
 <style>
 /* 右上のメニュー、ヘッダー、デフォルトフッターを隠す */
-#MainMenu {display: none !important; visibility: hidden !important;}
-header {display: none !important; visibility: hidden !important;}
-footer {display: none !important; visibility: hidden !important;}
-[data-testid="stHeader"] {display: none !important; visibility: hidden !important;}
-[data-testid="stFooter"] {display: none !important; visibility: hidden !important;}
-[data-testid="stBottom"] {display: none !important; visibility: hidden !important;}
+#MainMenu {display: none !important;}
+header {display: none !important;}
+footer {display: none !important;}
 
-/* ★ 今回のターゲット：?embed=true 時に下部に出現する「Built with Streamlit / Fullscreen」のグレー帯を完全消去 */
-.stEmbedFooter {display: none !important; visibility: hidden !important; opacity: 0 !important;}
-[data-testid="stEmbedFooter"] {display: none !important; visibility: hidden !important; opacity: 0 !important;}
-[data-testid="stBottomBlock"] {display: none !important; visibility: hidden !important; opacity: 0 !important;}
-div:has(a[href*="streamlit.io"]) {display: none !important; visibility: hidden !important;}
-div:has(> a[href*="streamlit.io"]) {display: none !important; visibility: hidden !important;}
+/* ========================================================
+   ★徹底破壊領域：Streamlit Cloudが勝手に追加するフッター・帯を全消去 
+   ======================================================== */
 
-/* 念のためクラウド右下のフローティングアイコン（赤や緑のバッジ）も防ぐ */
+/* Streamlit特有の親要素（.stApp）直下のフッターを強制非表示にして高さをゼロに */
+.stApp > footer { 
+    display: none !important; 
+    height: 0 !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+}
+
+/* 埋め込み時(embed=true)に出現する要素（グレーの帯）をあらゆる属性・クラスで指定して消す */
+.stEmbedFooter { display: none !important; }
+[data-testid="stEmbedFooter"] { display: none !important; }
+[data-testid="stBottomBlock"] { display: none !important; }
+[data-testid="stBottom"] { display: none !important; }
+[data-testid="stBottomBar"] { display: none !important; }
+[data-testid="stAppBottom"] { display: none !important; }
+
+/* リンクテキスト「Built with Streamlit」や「Fullscreen」が含まれる要素の親を消去 */
+div:has(> a[href*="streamlit.io"]) { display: none !important; }
+div:has(a[href*="streamlit.io"]) { display: none !important; }
+
+/* iPhone等のWebViewで、一番下にできる無駄な余白（スクロール領域）をカットする */
+.appview-container { 
+    margin-bottom: 0 !important; 
+    padding-bottom: 0 !important; 
+}
+/* メインコンテンツの一番下にある不自然なパディングを削除 */
+.block-container { 
+    padding-bottom: 1rem !important; 
+}
+
+/* 念のため、クラウド右下のフローティングアイコン（赤や緑のバッジ）も引き続きブロック */
 .stDeployButton {display: none !important;}
 [data-testid="manage-app-button"] {display: none !important;}
-[data-testid="stToolbar"] {display: none !important;}
-[data-testid="stDecoration"] {display: none !important;}
-[data-testid="stStatusWidget"] {display: none !important;}
-[class^="viewerBadge"] {display: none !important; visibility: hidden !important;}
-[class*="viewerBadge"] {display: none !important; visibility: hidden !important;}
-[class^="manageAppBadge"] {display: none !important; visibility: hidden !important;}
-[class*="manageAppBadge"] {display: none !important; visibility: hidden !important;}
-div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important; visibility: hidden !important; pointer-events: none !important;}
+[class^="viewerBadge"] {display: none !important;}
+[class*="viewerBadge"] {display: none !important;}
+[class^="manageAppBadge"] {display: none !important;}
+[class*="manageAppBadge"] {display: none !important;}
+div[style*="position: fixed"][style*="bottom"][style*="right"] {display: none !important;}
+/* ======================================================== */
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
