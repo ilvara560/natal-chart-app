@@ -19,24 +19,37 @@ except ImportError:
 # ==========================================
 def get_gemini_reading_stream(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
-    data = {"contents": [{"parts": [{"text": prompt}]}]}
+    
+    # ★変更：途中で切れないよう maxOutputTokens を最大化（8192）に明示的に設定
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 8192} 
+    }
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
     
-    with urllib.request.urlopen(req) as response:
+    # ★変更：タイムアウトを長くし、分割されたデータ（チャンク割れ）を確実につなぎ合わせる安全な処理を追加
+    with urllib.request.urlopen(req, timeout=180) as response:
+        buffer = ""
         for line in response:
-            line = line.decode('utf-8').strip()
-            if line.startswith("data: "):
-                data_str = line[6:]
+            line_str = line.decode('utf-8')
+            if line_str.startswith("data: "):
+                data_str = line_str[6:].strip()
                 if data_str == "[DONE]":
                     break
+                
+                # データをバッファに溜める
+                buffer += data_str
                 try:
-                    chunk_json = json.loads(data_str)
+                    # バッファが完全なJSONデータになった時だけ読み込む
+                    chunk_json = json.loads(buffer)
                     if "candidates" in chunk_json and len(chunk_json["candidates"]) > 0:
                         parts = chunk_json["candidates"][0].get("content", {}).get("parts", [])
                         if parts:
                             chunk_text = parts[0].get("text", "")
                             yield chunk_text.replace('*', '')
+                    buffer = ""  # 成功したらバッファを空にする
                 except json.JSONDecodeError:
+                    # JSONが途切れている場合はエラーを出さず、次の行が来るのを待つ
                     pass
 
 # ==========================================
@@ -871,7 +884,7 @@ if st.session_state.show_dashboard:
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
-# ★ 変更箇所：リンクではなく、ボタンを押すとテキストファイルの内容をダイアログ表示する実装
+# ★ プライバシーポリシーのダイアログ（ポップアップ）表示
 st.markdown("""
 <div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px; margin-bottom: 10px;">
     Navigated by Nabi
