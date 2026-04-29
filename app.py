@@ -20,14 +20,14 @@ except ImportError:
 def get_gemini_reading_stream(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
     
-    # ★変更：途中で切れないよう maxOutputTokens を最大化（8192）に明示的に設定
+    # ★maxOutputTokens を最大化（8192）に明示的に設定
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 8192} 
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
     
-    # ★変更：タイムアウトを長くし、分割されたデータ（チャンク割れ）を確実につなぎ合わせる安全な処理を追加
+    # ★タイムアウトを長くし、分割されたデータを確実につなぎ合わせる安全な処理
     with urllib.request.urlopen(req, timeout=180) as response:
         buffer = ""
         for line in response:
@@ -608,7 +608,7 @@ table th, table td {
 """, unsafe_allow_html=True)
 # =========================================================================
 
-# ★ 追加箇所：プライバシーポリシーをフワッと表示するダイアログ（ポップアップ）機能
+# ★ プライバシーポリシーをフワッと表示するダイアログ（ポップアップ）機能
 @st.dialog("Privacy Policy")
 def show_privacy_policy():
     try:
@@ -629,14 +629,16 @@ if "show_dashboard" not in st.session_state:
 with st.form("input_form"):
     col1, col2 = st.columns(2)
     with col1:
-        name_in = st.text_input("Name (e.g., Goro Sakamaki)", value="Goro Sakamaki")
+        # ★ 変更箇所：初期値（ご自身のお名前等）を空欄にし、汎用的なプレースホルダーに変更
+        name_in = st.text_input("Name (e.g., Taro Yamada)", value="")
     with col2:
         JST = timezone(timedelta(hours=+9), 'JST')
         current_year = datetime.now(JST).year
         min_date = datetime(current_year - 100, 1, 1).date()
         max_date = datetime(current_year, 12, 31).date()
             
-        birth_date = st.date_input("Birthday", value=datetime(1971, 6, 25), min_value=min_date, max_value=max_date)
+        # ★ 変更箇所：初期選択日を汎用的な日付（2000/1/1）に変更
+        birth_date = st.date_input("Birthday", value=datetime(2000, 1, 1), min_value=min_date, max_value=max_date)
         birth_in = birth_date.strftime("%Y%m%d")
     
     submitted = st.form_submit_button("Generate Dashboard")
