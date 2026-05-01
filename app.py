@@ -15,7 +15,32 @@ except ImportError:
     HAS_FPDF = False
 
 # ==========================================
-# 1. API呼び出し関数（ストリーミング対応版）
+# ★設定ファイル（コントロールファイル）の読み込み
+# ==========================================
+def load_settings():
+    settings_file = "settings.json"
+    default_settings = {"enable_synastry": True}
+    
+    if os.path.exists(settings_file):
+        try:
+            with open(settings_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return default_settings
+    else:
+        try:
+            with open(settings_file, "w", encoding="utf-8") as f:
+                json.dump(default_settings, f, indent=4)
+        except Exception:
+            pass
+        return default_settings
+
+APP_SETTINGS = load_settings()
+ENABLE_SYNASTRY = APP_SETTINGS.get("enable_synastry", True)
+
+
+# ==========================================
+# 1. API呼び出し関数（完全修復型フェイルセーフ版）
 # ==========================================
 def get_gemini_reading_stream(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
@@ -26,26 +51,41 @@ def get_gemini_reading_stream(api_key, model, prompt):
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
     
-    with urllib.request.urlopen(req, timeout=180) as response:
-        buffer = ""
-        for line in response:
-            line_str = line.decode('utf-8')
-            if line_str.startswith("data: "):
-                data_str = line_str[6:].strip()
-                if data_str == "[DONE]":
-                    break
+    buffer = ""
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            for line in response:
+                line_str = line.decode('utf-8')
                 
-                buffer += data_str
+                if not line_str.strip():
+                    continue
+                    
+                if line_str.startswith("data: "):
+                    content = line_str[6:].strip()
+                    if content == "[DONE]":
+                        break
+                    buffer = content
+                else:
+                    buffer += line_str.strip()
+                    
                 try:
                     chunk_json = json.loads(buffer)
                     if "candidates" in chunk_json and len(chunk_json["candidates"]) > 0:
-                        parts = chunk_json["candidates"][0].get("content", {}).get("parts", [])
+                        cand = chunk_json["candidates"][0]
+                        parts = cand.get("content", {}).get("parts", [])
                         if parts:
                             chunk_text = parts[0].get("text", "")
                             yield chunk_text.replace('*', '')
-                    buffer = ""  
+                        
+                        finish_reason = cand.get("finishReason")
+                        if finish_reason and finish_reason not in ("STOP", ""):
+                            yield f"\n\n[⚠️AIの生成が停止しました: {finish_reason}]"
+                            
+                    buffer = "" 
                 except json.JSONDecodeError:
                     pass
+    except Exception as e:
+        yield f"\n\n[⚠️ネットワーク通信エラーが発生しました: {str(e)}]\nもう一度お試しください。"
 
 # ==========================================
 # ロジック・テキスト出力・PDF出力
@@ -213,13 +253,14 @@ class NatalChart:
             6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
         }
         
+        # 105歳対応のテキストレポート出力 (35年×3列)
         lines.append(" [ Year Cycle Table ]")
         lines.append("  Age | Year | Cyc Theme    || Age | Year | Cyc Theme    || Age | Year | Cyc Theme")
         lines.append("  " + "-" * 81)
-        for r in range(27):
+        for r in range(35):
             row_str = ""
             for c_idx in range(3):
-                age = r + c_idx * 27
+                age = r + c_idx * 35
                 y = res["BirthYear"] + age
                 cyc = self._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
                 theme = cycle_keywords.get(cyc, "")
@@ -230,159 +271,203 @@ class NatalChart:
         lines.append("=" * 75)
         return "\n".join(lines)
 
-    def export_graphical_pdf(self, filename="Graphical_Report.pdf", ai_text=None):
+    def export_graphical_pdf(self, filename="Premium_Report.pdf", ai_text=None, pdf=None):
         if not HAS_FPDF: return None
-        pdf = FPDF()
+        
+        is_main = False
+        if pdf is None:
+            pdf = FPDF()
+            is_main = True
+            
         pdf.add_page()
         
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "B", 16)
-        pdf.cell(0, 10, "NATAL CHART ANALYSIS REPORT", new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.set_text_color(0, 0, 0)
+        NAVY = (44, 62, 80)
+        GOLD = (212, 175, 55)
+        LIGHT_GREY = (245, 247, 250)
+        BORDER_GREY = (220, 220, 220)
+        TEXT_GREY = (100, 100, 100)
         
-        pdf.set_font("Helvetica", "", 10)
-        b_date_str = f"{self.results['BirthYear']}{self.results['BirthMonth']:02}{self.results['BirthDay']:02}"
-        pdf.cell(0, 10, f"Name: {self.raw_name.upper()}  |  Birthdate: {b_date_str}", new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.ln(5)
+        pdf.set_fill_color(*NAVY)
+        pdf.rect(0, 0, 210, 40, 'F')
+        
+        pdf.set_fill_color(*GOLD)
+        pdf.rect(0, 40, 210, 2, 'F')
+        
+        pdf.set_y(12)
+        pdf.set_text_color(*GOLD)
+        pdf.set_font("Helvetica", "B", 22)
+        pdf.cell(0, 10, "NATAL CHART ANALYSIS", new_x="LMARGIN", new_y="NEXT", align="C")
+        
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "", 11)
+        b_date_str = f"{self.results['BirthYear']} / {self.results['BirthMonth']:02} / {self.results['BirthDay']:02}"
+        pdf.cell(0, 8, f"{self.raw_name.upper()}   |   {b_date_str}", new_x="LMARGIN", new_y="NEXT", align="C")
+        
+        pdf.set_y(50)
 
-        pdf.set_fill_color(245, 247, 250)
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Core Numbers & Themes ]", new_x="LMARGIN", new_y="NEXT", fill=True)
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "", 10)
+        def draw_section_header(title):
+            pdf.ln(4)
+            y_start = pdf.get_y()
+            pdf.set_fill_color(*LIGHT_GREY)
+            pdf.rect(10, y_start, 190, 8, 'F')
+            
+            pdf.set_fill_color(*GOLD)
+            pdf.rect(10, y_start, 2, 8, 'F')
+            
+            pdf.set_y(y_start)
+            pdf.set_x(15)
+            pdf.set_text_color(*NAVY)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 8, title, new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(2)
+
+        draw_section_header("CORE NUMBERS & THEMES")
         res = self.results
         
         data_left = [["Birth Number", res["BirthNum"]], ["Destiny Number", res["DestinyNum"]], ["Soul Number", res["SoulNum"]], ["Personality Number", res["PersoNum"]], ["Realization Number", res["RealizNum"]]]
         data_right = [["Stage Number", res["StageNum"]], ["Challenge Number", res["ChallNum"]], ["New Strength", res["Strengths"]], ["Hidden Theme", res["SubTheme"]], ["Carmic Number", res["CarmicNum"]]]
         
+        pdf.set_draw_color(*BORDER_GREY)
         y_start = pdf.get_y()
-        for item in data_left:
-            pdf.cell(50, 7, item[0], border=1, new_x="RIGHT", new_y="TOP")
-            pdf.cell(15, 7, str(item[1]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
         
+        for item in data_left:
+            pdf.set_fill_color(*LIGHT_GREY)
+            pdf.set_text_color(*TEXT_GREY)
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(50, 8, f" {item[0]}", border=1, new_x="RIGHT", new_y="TOP", fill=True)
+            
+            pdf.set_fill_color(255, 255, 255)
+            pdf.set_text_color(*NAVY)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(15, 8, str(item[1]), border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=True)
+            
         pdf.set_xy(10 + 65 + 10, y_start)
         for item in data_right:
             pdf.set_x(10 + 65 + 10)
-            pdf.cell(50, 7, item[0], border=1, new_x="RIGHT", new_y="TOP")
-            pdf.cell(15, 7, str(item[1]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.set_fill_color(*LIGHT_GREY)
+            pdf.set_text_color(*TEXT_GREY)
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(50, 8, f" {item[0]}", border=1, new_x="RIGHT", new_y="TOP", fill=True)
+            
+            pdf.set_fill_color(255, 255, 255)
+            pdf.set_text_color(*NAVY)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(15, 8, str(item[1]), border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=True)
         
-        pdf.set_y(y_start + (7 * 5) + 5)
+        pdf.set_y(y_start + (8 * 5) + 2)
 
-        pdf.set_fill_color(245, 247, 250)
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Turning Point Ages ]", new_x="LMARGIN", new_y="NEXT", fill=True)
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font("Helvetica", "", 9)
+        draw_section_header("TURNING POINT AGES")
 
         y_start_tp = pdf.get_y()
-        
-        pdf.cell(35, 7, "1st Turning Point", border=1, new_x="RIGHT", new_y="TOP")
-        pdf.cell(15, 7, f"{res['TP'][0]} yrs", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.set_fill_color(*LIGHT_GREY)
+        pdf.set_text_color(*TEXT_GREY)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(35, 8, " 1st Turning Point", border=1, new_x="RIGHT", new_y="TOP", fill=True)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(*NAVY)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(15, 8, f"{res['TP'][0]}", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
         
         pdf.set_xy(10 + 50 + 10, y_start_tp)
-        pdf.cell(45, 7, "2nd Turning Point (Main)", border=1, new_x="RIGHT", new_y="TOP")
-        pdf.cell(15, 7, f"{res['TP'][1]} yrs", border=1, new_x="RIGHT", new_y="TOP", align="C")
+        pdf.set_fill_color(*LIGHT_GREY)
+        pdf.set_text_color(*TEXT_GREY)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(45, 8, " 2nd Turning Point (Main)", border=1, new_x="RIGHT", new_y="TOP", fill=True)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(*NAVY)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(15, 8, f"{res['TP'][1]}", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
         
         pdf.set_xy(10 + 50 + 10 + 60 + 10, y_start_tp)
-        pdf.cell(35, 7, "3rd Turning Point", border=1, new_x="RIGHT", new_y="TOP")
-        pdf.cell(15, 7, f"{res['TP'][2]} yrs", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        
-        pdf.ln(5)
-
-        pdf.set_fill_color(245, 247, 250)
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, f" [ Life Cycle Stages ]", new_x="LMARGIN", new_y="NEXT", fill=True)
-        pdf.set_text_color(0, 0, 0)
-        
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(30, 7, "Term", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(40, 7, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(30, 7, "Milestone", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(30, 7, "Rout", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(30, 7, "Hardships", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.set_fill_color(*LIGHT_GREY)
+        pdf.set_text_color(*TEXT_GREY)
         pdf.set_font("Helvetica", "", 9)
-        for s in res["Stages"]:
-            pdf.cell(30, 7, s["term"], border=1, new_x="RIGHT", new_y="TOP")
-            pdf.cell(40, 7, s["age"], border=1, new_x="RIGHT", new_y="TOP", align="C")
-            pdf.cell(30, 7, str(s["pin"]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-            pdf.cell(30, 7, str(s["root"]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-            pdf.cell(30, 7, str(s["hard"]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(35, 8, " 3rd Turning Point", border=1, new_x="RIGHT", new_y="TOP", fill=True)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.set_text_color(*NAVY)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(15, 8, f"{res['TP'][2]}", border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=True)
         
-        pdf.ln(5)
+        draw_section_header("LIFE CYCLE STAGES")
         
-        pdf.set_fill_color(245, 247, 250)
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Nine Box ]", new_x="LMARGIN", new_y="NEXT", fill=True)
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(2)
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(30, 8, "Term", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+        pdf.cell(40, 8, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+        pdf.cell(30, 8, "Milestone", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+        pdf.cell(30, 8, "Rout", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+        pdf.cell(30, 8, "Hardships", border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=True)
+        
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*TEXT_GREY)
+        for i, s in enumerate(res["Stages"]):
+            fill_clr = True if i % 2 == 0 else False
+            pdf.set_fill_color(252, 253, 255)
+            
+            pdf.cell(30, 8, s["term"], border=1, new_x="RIGHT", new_y="TOP", align="C", fill=fill_clr)
+            pdf.cell(40, 8, s["age"], border=1, new_x="RIGHT", new_y="TOP", align="C", fill=fill_clr)
+            
+            pdf.set_text_color(*NAVY)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(30, 8, str(s["pin"]), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=fill_clr)
+            pdf.cell(30, 8, str(s["root"]), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=fill_clr)
+            pdf.cell(30, 8, str(s["hard"]), border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=fill_clr)
+            pdf.set_text_color(*TEXT_GREY)
+            pdf.set_font("Helvetica", "", 9)
+        
+        draw_section_header("NINE BOX ANALYSIS")
         
         c = res["Counts"]
         nbs = res["NineBoxSums"]
         y_start_nb = pdf.get_y()
         
-        pdf.set_text_color(127, 140, 141)
+        cell_size = 18
+        for row_idx, row_nums in enumerate([[3,6,9], [2,5,8], [1,4,7]]):
+            for col_idx, num in enumerate(row_nums):
+                pdf.set_xy(10 + (col_idx * cell_size), y_start_nb + (row_idx * cell_size))
+                pdf.set_fill_color(252, 253, 255)
+                pdf.rect(pdf.get_x(), pdf.get_y(), cell_size, cell_size, 'DF')
+                
+                pdf.set_text_color(180, 180, 180)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_xy(10 + (col_idx * cell_size) + 2, y_start_nb + (row_idx * cell_size) + 2)
+                pdf.cell(5, 5, f"[{num}]")
+                
+                pdf.set_text_color(*NAVY)
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_xy(10 + (col_idx * cell_size), y_start_nb + (row_idx * cell_size) + 6)
+                pdf.cell(cell_size, cell_size - 6, str(c[num]), align="C")
+                
+        pdf.set_xy(80, y_start_nb)
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(15, 6, "[3]", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, "[6]", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, "[9]", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "", 10)
-        pdf.cell(15, 6, str(c[3]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, str(c[6]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, str(c[9]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        
-        pdf.set_text_color(127, 140, 141)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(15, 6, "[2]", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, "[5]", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, "[8]", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "", 10)
-        pdf.cell(15, 6, str(c[2]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, str(c[5]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, str(c[8]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        
-        pdf.set_text_color(127, 140, 141)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(15, 6, "[1]", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, "[4]", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, "[7]", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "", 10)
-        pdf.cell(15, 6, str(c[1]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, str(c[4]), border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(15, 6, str(c[7]), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
-        pdf.set_text_color(0, 0, 0)
-
-        pdf.set_xy(70, y_start_nb)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(30, 6, "Sum Lines", border=1, new_x="RIGHT", new_y="TOP", align="C")
-        pdf.cell(20, 6, "Sum", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.cell(30, 7, "Line", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+        pdf.cell(20, 7, "Sum", border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=True)
         
         sums = [
-            ("3-6-9", nbs[0]), ("2-5-8", nbs[1]),
-            ("1-4-7", nbs[2]), ("1-2-3", nbs[3]),
-            ("4-5-6", nbs[4]), ("7-8-9", nbs[5]),
-            ("3-5-7", nbs[6]), ("1-5-9", nbs[7])
+            ("3-6-9", nbs[0]), ("2-5-8", nbs[1]), ("1-4-7", nbs[2]), ("1-2-3", nbs[3]),
+            ("4-5-6", nbs[4]), ("7-8-9", nbs[5]), ("3-5-7", nbs[6]), ("1-5-9", nbs[7])
         ]
         
         pdf.set_font("Helvetica", "", 9)
-        for s_name, s_val in sums:
-            pdf.set_x(70)
-            pdf.cell(30, 5, s_name, border=1, new_x="RIGHT", new_y="TOP", align="C")
-            pdf.cell(20, 5, str(s_val), border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+        for i, (s_name, s_val) in enumerate(sums):
+            pdf.set_x(80)
+            fill_clr = True if i % 2 == 0 else False
+            pdf.set_fill_color(252, 253, 255)
+            pdf.set_text_color(*TEXT_GREY)
+            pdf.cell(30, 6, s_name, border=1, new_x="RIGHT", new_y="TOP", align="C", fill=fill_clr)
+            pdf.set_text_color(*NAVY)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(20, 6, str(s_val), border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=fill_clr)
+            pdf.set_font("Helvetica", "", 9)
 
-        # 5. Year Cycle Table
+        # --- Page 2: Year Cycle (105歳対応 / 35年×3列) ---
         pdf.add_page()
-        pdf.set_fill_color(245, 247, 250)
-        pdf.set_text_color(74, 144, 226)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 8, " [ Year Cycle Table ]", new_x="LMARGIN", new_y="NEXT", fill=True)
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_draw_color(*BORDER_GREY)
+        draw_section_header("YEAR CYCLE TABLE (Age 0 - 104)")
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
@@ -391,31 +476,41 @@ class NatalChart:
 
         def get_cycle_rgb(cycle):
             mapping = {
-                1: (255, 229, 229), 2: (255, 242, 229), 3: (255, 255, 229),
-                4: (229, 255, 229), 5: (229, 255, 255), 6: (229, 242, 255),
-                7: (229, 229, 255), 8: (242, 229, 255), 9: (255, 229, 242)
+                1: (255, 240, 240), 2: (255, 248, 240), 3: (255, 255, 240),
+                4: (240, 255, 240), 5: (240, 255, 255), 6: (240, 248, 255),
+                7: (240, 240, 255), 8: (248, 240, 255), 9: (255, 240, 248)
             }
             return mapping.get(cycle, (255, 255, 255))
 
-        table_width = (8 + 12 + 6 + 22) * 3 + 5 * 2
+        # 元の美しい3列幅設定を復元
+        col_w_age = 8
+        col_w_year = 12
+        col_w_cyc = 6
+        col_w_theme = 22
+        col_w_gap = 5
+        table_width = (col_w_age + col_w_year + col_w_cyc + col_w_theme) * 3 + col_w_gap * 2
         start_x = (210 - table_width) / 2
 
-        pdf.set_fill_color(255, 255, 255)
+        pdf.set_fill_color(*NAVY)
+        pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_x(start_x)
-        for _ in range(3):
-            pdf.cell(8, 6, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-            pdf.cell(12, 6, "Year", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-            pdf.cell(6, 6, "Cy", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-            pdf.cell(22, 6, "Theme", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-            pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
+        for i in range(3):
+            pdf.cell(col_w_age, 6, "Age", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(col_w_year, 6, "Year", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(col_w_cyc, 6, "Cy", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            pdf.cell(col_w_theme, 6, "Theme", border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+            if i < 2:
+                pdf.cell(col_w_gap, 6, "", border=0, new_x="RIGHT", new_y="TOP")
         pdf.ln()
 
+        pdf.set_text_color(*TEXT_GREY)
         pdf.set_font("Helvetica", "", 8)
-        for r in range(27):
+        # 35行で出力
+        for r in range(35):
             pdf.set_x(start_x)
             for c_idx in range(3):
-                age = r + c_idx * 27
+                age = r + c_idx * 35
                 y = res["BirthYear"] + age
                 cyc = self._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
                 theme = cycle_keywords.get(cyc, "")
@@ -423,21 +518,24 @@ class NatalChart:
                 rgb = get_cycle_rgb(cyc)
                 pdf.set_fill_color(rgb[0], rgb[1], rgb[2])
                 
-                pdf.cell(8, 6, str(age), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-                pdf.cell(12, 6, str(y), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-                pdf.cell(6, 6, str(cyc), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-                pdf.cell(22, 6, theme, border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
-                pdf.cell(5, 6, "", border=0, new_x="RIGHT", new_y="TOP")
+                pdf.cell(col_w_age, 5, str(age), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                pdf.cell(col_w_year, 5, str(y), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                
+                pdf.set_text_color(*NAVY)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.cell(col_w_cyc, 5, str(cyc), border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                
+                pdf.set_text_color(*TEXT_GREY)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.cell(col_w_theme, 5, theme, border=1, new_x="RIGHT", new_y="TOP", align="C", fill=True)
+                
+                if c_idx < 2:
+                    pdf.cell(col_w_gap, 5, "", border=0, new_x="RIGHT", new_y="TOP")
             pdf.ln()
             
         if ai_text:
             pdf.add_page()
-            pdf.set_fill_color(245, 247, 250)
-            pdf.set_text_color(74, 144, 226)
-            pdf.set_font("Helvetica", "B", 11)
-            pdf.cell(0, 8, " [ Personalized Reading ]", new_x="LMARGIN", new_y="NEXT", fill=True)
-            pdf.set_text_color(0, 0, 0)
-            pdf.ln(5)
+            draw_section_header("PERSONALIZED READING")
             
             font_filename = "NotoSansJP-Regular.ttf"
             font_url = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP-Regular.ttf"
@@ -449,8 +547,7 @@ class NatalChart:
                         header = f.read(4)
                         if header in (b'\x00\x01\x00\x00', b'OTTO', b'true'):
                             is_valid_font = True
-                except:
-                    pass
+                except: pass
             
             if not is_valid_font:
                 if os.path.exists(font_filename): os.remove(font_filename)
@@ -468,22 +565,24 @@ class NatalChart:
                     for line in ai_text.split('\n'):
                         line = line.strip()
                         if not line:
-                            pdf.ln(3)
+                            pdf.ln(4)
                             continue
+                        
                         is_heading = False
                         display_text = line
                         if line.startswith('#'):
                             is_heading = True
                             level = len(line) - len(line.lstrip('#'))
                             display_text = line.lstrip('#').strip()
-                            pdf.ln(3)
-                            pdf.set_text_color(74, 144, 226)
+                            pdf.ln(4)
+                            pdf.set_text_color(*GOLD)
                             if level == 1: pdf.set_font("NotoSansJP", "", 14)
                             elif level == 2: pdf.set_font("NotoSansJP", "", 13)
-                            else: pdf.set_font("NotoSansJP", "", 12)
+                            else: pdf.set_font("NotoSansJP", "", 11)
                         else:
-                            pdf.set_text_color(0, 0, 0)
+                            pdf.set_text_color(50, 50, 50)
                             pdf.set_font("NotoSansJP", "", 10)
+                            
                         current_str = ""
                         line_height = 8 if is_heading else 6
                         for char in display_text:
@@ -494,9 +593,6 @@ class NatalChart:
                                 current_str += char
                         if current_str:
                             pdf.cell(0, line_height, current_str, new_x="LMARGIN", new_y="NEXT", align="L")
-                        if is_heading:
-                            pdf.set_text_color(0, 0, 0)
-                            pdf.set_font("NotoSansJP", "", 10)
                 except Exception:
                     pdf.set_font("Helvetica", "", 10)
                     pdf.cell(0, 6, "(Font integration error.)", new_x="LMARGIN", new_y="NEXT")
@@ -504,8 +600,216 @@ class NatalChart:
                 pdf.set_font("Helvetica", "", 10)
                 pdf.cell(0, 6, "(Font download failed.)", new_x="LMARGIN", new_y="NEXT")
 
-        pdf.output(filename)
-        return filename
+        pdf.set_y(-15)
+        pdf.set_text_color(180, 180, 180)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.cell(0, 10, "Navigated by Nabi", align="C")
+
+        if is_main:
+            pdf.output(filename)
+            return filename
+        return pdf
+
+
+# ==========================================
+# UI レンダリング用関数
+# ==========================================
+def render_dashboard(chart1, chart2=None):
+    res1 = chart1.results
+    c1 = res1["Counts"]
+    
+    res2 = chart2.results if chart2 else None
+    c2 = res2["Counts"] if chart2 else None
+
+    def draw_metric(col, label, key, is_tp=False):
+        val1 = f"{res1['TP'][key]} yrs" if is_tp else str(res1[key])
+        val2_html = ""
+        if res2:
+            val2 = f"{res2['TP'][key]} yrs" if is_tp else str(res2[key])
+            val2_html = f"<span class='metric-value-sub'>({val2})</span>"
+        
+        html = f"""
+        <div class="custom-metric">
+            <div class="metric-label">{label}</div>
+            <div><span class="metric-value-main">{val1}</span>{val2_html}</div>
+        </div>
+        """
+        col.markdown(html, unsafe_allow_html=True)
+    
+    st.markdown('<div class="section-header">[ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
+    
+    c1_col, c2_col, c3_col, c4_col, c5_col = st.columns(5)
+    draw_metric(c1_col, "Birth Number", "BirthNum")
+    draw_metric(c2_col, "Destiny Number", "DestinyNum")
+    draw_metric(c3_col, "Soul Number", "SoulNum")
+    draw_metric(c4_col, "Personality Number", "PersoNum")
+    draw_metric(c5_col, "Realization Number", "RealizNum")
+    
+    st.write("") 
+    
+    c6_col, c7_col, c8_col, c9_col, c10_col = st.columns(5)
+    draw_metric(c6_col, "Stage Number", "StageNum")
+    draw_metric(c7_col, "Challenge Number", "ChallNum")
+    draw_metric(c8_col, "New Strength", "Strengths")
+    draw_metric(c9_col, "Hidden Theme", "SubTheme")
+    draw_metric(c10_col, "Carmic Number", "CarmicNum")
+
+    st.markdown('<div class="section-header">[ Turning Point Ages ]</div>', unsafe_allow_html=True)
+    c1_tp, c2_tp, c3_tp = st.columns(3)
+    draw_metric(c1_tp, "1st Turning Point", 0, is_tp=True)
+    draw_metric(c2_tp, "2nd Turning Point (Main)", 1, is_tp=True)
+    draw_metric(c3_tp, "3rd Turning Point", 2, is_tp=True)
+
+    st.markdown('<div class="section-header">[ Life Cycle Stages ]</div>', unsafe_allow_html=True)
+    
+    stages_data = []
+    for i in range(len(res1["Stages"])):
+        s1 = res1["Stages"][i]
+        s_dict = {"Term": s1["term"], "Age": s1["age"]}
+        if res2:
+            s2 = res2["Stages"][i]
+            s_dict["Milestone"] = f"{s1['pin']} ({s2['pin']})"
+            s_dict["Rout"] = f"{s1['root']} ({s2['root']})"
+            s_dict["Hardships"] = f"{s1['hard']} ({s2['hard']})"
+        else:
+            s_dict["Milestone"] = str(s1['pin'])
+            s_dict["Rout"] = str(s1['root'])
+            s_dict["Hardships"] = str(s1['hard'])
+        stages_data.append(s_dict)
+        
+    df_stages = pd.DataFrame(stages_data)
+    styled_stages = df_stages.style.set_properties(**{'text-align': 'center'}) \
+        .set_table_styles([dict(selector='th', props=[('text-align', 'center')])]) \
+        .hide(axis="index")
+    st.table(styled_stages)
+    
+    st.markdown('<div class="section-header">[ Nine Box ]</div>', unsafe_allow_html=True)
+    
+    def get_c_html(num):
+        main_c = c1[num]
+        sub_c = f" <span style='font-size:14px; color:gray; font-weight:normal;'>({c2[num]})</span>" if c2 else ""
+        return f"<span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{main_c}</span>{sub_c}"
+
+    col_box, col_sums = st.columns([1, 1])
+    with col_box:
+        html_grid = f"""
+        <table style='width: 100%; max-width: 400px; text-align: center; border-collapse: separate; border-spacing: 8px;'>
+            <tr>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[3]</span><br>{get_c_html(3)}
+            </td>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[6]</span><br>{get_c_html(6)}
+            </td>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[9]</span><br>{get_c_html(9)}
+            </td>
+            </tr>
+            <tr>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[2]</span><br>{get_c_html(2)}
+            </td>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[5]</span><br>{get_c_html(5)}
+            </td>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[8]</span><br>{get_c_html(8)}
+            </td>
+            </tr>
+            <tr>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[1]</span><br>{get_c_html(1)}
+            </td>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[4]</span><br>{get_c_html(4)}
+            </td>
+            <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
+                <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[7]</span><br>{get_c_html(7)}
+            </td>
+            </tr>
+        </table>
+        """
+        st.markdown(html_grid, unsafe_allow_html=True)
+        
+    with col_sums:
+        ma1 = res1["MagicArray"]
+        nbs1 = res1["NineBoxSums"]
+        max_val1 = res1["NineBoxMax"] if res1["NineBoxMax"] > 0 else 1
+        
+        nbs2 = res2["NineBoxSums"] if res2 else None
+        
+        sum_lines_data = [
+            {"name": "3-6-9", "str1": nbs1[0], "str2": nbs2[0] if nbs2 else "", "num": ma1[0]},
+            {"name": "2-5-8", "str1": nbs1[1], "str2": nbs2[1] if nbs2 else "", "num": ma1[1]},
+            {"name": "1-4-7", "str1": nbs1[2], "str2": nbs2[2] if nbs2 else "", "num": ma1[2]},
+            {"name": "1-2-3", "str1": nbs1[3], "str2": nbs2[3] if nbs2 else "", "num": ma1[3]},
+            {"name": "4-5-6", "str1": nbs1[4], "str2": nbs2[4] if nbs2 else "", "num": ma1[4]},
+            {"name": "7-8-9", "str1": nbs1[5], "str2": nbs2[5] if nbs2 else "", "num": ma1[5]},
+            {"name": "3-5-7", "str1": nbs1[6], "str2": nbs2[6] if nbs2 else "", "num": ma1[6]},
+            {"name": "1-5-9", "str1": nbs1[7], "str2": nbs2[7] if nbs2 else "", "num": ma1[7]}
+        ]
+        
+        sum_html = "<table style='width:100%; border-collapse: collapse; margin-top: 10px; color: inherit;'>"
+        sum_html += "<tr style='border-bottom: 2px solid var(--border-color);'><th style='padding:8px; text-align:center;'>Sum Lines</th><th style='padding:8px; text-align:center;'>Sum</th><th style='padding:8px; width:50%;'></th></tr>"
+        for s in sum_lines_data:
+            bar_w = int((s["num"] / max_val1) * 100) if s["str1"] != "_" else 0
+            bar = f"<div style='width:{bar_w}%; background-color:#4a90e2; height:12px; border-radius:3px; transform-origin: left; animation: expandBar 1.2s cubic-bezier(0.1, 0.7, 0.1, 1) both 0.5s;'></div>" if bar_w > 0 else ""
+            
+            sub_str_html = f" <span style='font-size:12px; color:gray; font-weight:normal;'>({s['str2']})</span>" if s['str2'] else ""
+            sum_html += f"<tr><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center;'>{s['name']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center; font-weight:bold;'>{s['str1']}{sub_str_html}</td><td style='padding:8px; border-bottom:1px solid var(--border-color);'>{bar}</td></tr>"
+        sum_html += "</table>"
+        st.markdown(sum_html, unsafe_allow_html=True)
+
+    st.markdown('<div class="section-header">[ Year Cycle Table (Age 0 - 104) ]</div>', unsafe_allow_html=True)
+    
+    cycle_keywords = {
+        1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
+        6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
+    }
+    
+    # 3列のレイアウトに戻し、1列を35年に変更 (35年 × 3列 = 105歳まで)
+    col_a, col_b, col_c = st.columns(3)
+    
+    def create_cycle_df(start_age, end_age):
+        data = []
+        for age in range(start_age, end_age):
+            y = res1["BirthYear"] + age
+            cyc1 = chart1._get_personal_year(y, res1["BirthMonth"], res1["BirthDay"])
+            theme1 = cycle_keywords.get(cyc1, "")
+            
+            if chart2:
+                cyc2 = chart2._get_personal_year(y, res2["BirthMonth"], res2["BirthDay"])
+                cyc_str = f"{cyc1} ({cyc2})"
+            else:
+                cyc_str = str(cyc1)
+                
+            data.append({"Age": age, "Year": y, "Cycle": cyc_str, "Theme": theme1})
+        return pd.DataFrame(data)
+
+    def color_cycle(val):
+        try:
+            main_val = int(str(val).split(' ')[0])
+        except:
+            main_val = val
+            
+        colors = {
+            1: '#ffe5e5', 2: '#fff2e5', 3: '#ffffe5', 
+            4: '#e5ffe5', 5: '#e5ffff', 6: '#e5f2ff', 
+            7: '#e5e5ff', 8: '#f2e5ff', 9: '#ffe5f2'
+        }
+        bg_color = colors.get(main_val, '')
+        return f'background-color: {bg_color}; color: #000000;' if bg_color else ''
+
+    def style_cycles(df):
+        return df.style.map(color_cycle, subset=['Cycle']) \
+                       .set_properties(**{'text-align': 'center'}) \
+                       .set_table_styles([dict(selector='th', props=[('text-align', 'center')])]) \
+                       .hide(axis="index")
+
+    with col_a: st.table(style_cycles(create_cycle_df(0, 35)))
+    with col_b: st.table(style_cycles(create_cycle_df(35, 70)))
+    with col_c: st.table(style_cycles(create_cycle_df(70, 105)))
+
 
 # ==========================================
 # Streamlit を用いた モダン Web UI 実装
@@ -514,7 +818,6 @@ st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
 st.markdown("""
 <style>
-/* ヘッダー・フッター・メニュー・クラウド特有ボタンの非表示処理 */
 header { visibility: hidden !important; display: none !important; }
 footer { visibility: hidden !important; display: none !important; }
 #MainMenu { visibility: hidden !important; display: none !important; }
@@ -534,71 +837,32 @@ a[title="Fullscreen"], svg[title="Fullscreen"], button[title="Fullscreen"] { dis
 .block-container { padding-bottom: 1rem !important; margin-bottom: 0rem !important; }
 
 button[kind="tertiary"], button[kind="tertiary"] p {
-    color: gray !important;
-    font-size: 12px !important;
-    font-weight: normal !important;
-    font-family: inherit !important;
+    color: gray !important; font-size: 12px !important; font-weight: normal !important; font-family: inherit !important;
 }
 button[kind="tertiary"]:hover p { text-decoration: underline !important; }
 
-div[data-testid="metric-container"] {
-    background-color: var(--secondary-background-color);
-    border: 1px solid var(--border-color);
-    padding: 15px 20px;
-    border-radius: 10px;
-    box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
-    transition: transform 0.2s ease-in-out;
-    text-align: center;
+.custom-metric {
+    background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 15px 20px;
+    border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s ease-in-out; text-align: center;
+    margin-bottom: 1rem; animation: fadeInUp 0.7s ease-out both 0.15s;
 }
-div[data-testid="metric-container"] > div {
-    justify-content: center;
-    align-items: center;
-}
-div[data-testid="metric-container"]:hover {
-    transform: translateY(-3px);
-    box-shadow: 4px 6px 12px rgba(0,0,0,0.2);
-}
-.section-header {
-    color: #4a90e2 !important; 
-    border-bottom: 2px solid #4a90e2 !important;
-    padding-bottom: 8px;
-    margin-top: 40px;
-    margin-bottom: 20px;
-    font-size: 1.6em;
-    font-weight: 600;
-    width: 100%;
-    display: block;
-}
-table th, table td {
-    text-align: center !important;
-}
+.custom-metric:hover { transform: translateY(-3px); box-shadow: 4px 6px 12px rgba(0,0,0,0.2); }
+.metric-label { font-size: 14px; color: gray; margin-bottom: 4px; }
+.metric-value-main { font-size: 1.8rem; color: var(--text-color); }
+.metric-value-sub { font-size: 1rem; color: gray; margin-left: 8px; }
 
-/* ========================================================================= */
-/* ★ 拡張機能：結果画面のフェードイン＆グラフ伸長アニメーション ★ */
-/* ========================================================================= */
-@keyframes fadeInUp {
-    0% { opacity: 0; transform: translateY(20px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes expandBar {
-    0% { transform: scaleX(0); }
-    100% { transform: scaleX(1); }
-}
-
-/* 見出し、数字パネル、テーブル全体に下からフワッと浮き上がる効果を付与 */
 .section-header {
-    animation: fadeInUp 0.7s ease-out both;
+    color: #4a90e2 !important; border-bottom: 2px solid #4a90e2 !important; padding-bottom: 8px; margin-top: 40px; margin-bottom: 20px;
+    font-size: 1.6em; font-weight: 600; width: 100%; display: block; animation: fadeInUp 0.7s ease-out both;
 }
-div[data-testid="metric-container"] {
-    animation: fadeInUp 0.7s ease-out both 0.15s;
-}
-div[data-testid="stTable"] {
-    animation: fadeInUp 0.7s ease-out both 0.3s;
-}
-table {
-    animation: fadeInUp 0.7s ease-out both 0.2s;
-}
-/* ========================================================================= */
+table th, table td { text-align: center !important; }
+
+@keyframes fadeInUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes expandBar { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+
+div[data-testid="stTable"] { animation: fadeInUp 0.7s ease-out both 0.3s; }
+table { animation: fadeInUp 0.7s ease-out both 0.2s; }
+[data-testid="stTabs"] button { font-size: 1.1em; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -610,190 +874,90 @@ def show_privacy_policy():
         st.markdown(policy_text)
     except FileNotFoundError:
         st.error("プライバシーポリシーのファイルが見つかりません。")
-        st.info("app.py と同じフォルダに「privacy_policy.txt」という名前のテキストファイルを作成して文章を保存してください。")
 
 st.title("Natal Chart Dashboard")
-st.write("Enter your details below to generate a comprehensive Numerology analysis.")
+
+if ENABLE_SYNASTRY:
+    st.write("Enter details below to generate a comprehensive Numerology analysis. (Optional: Add a 2nd person for Synastry)")
+else:
+    st.write("Enter your details below to generate a comprehensive Numerology analysis.")
 
 if "show_dashboard" not in st.session_state:
     st.session_state.show_dashboard = False
 
 with st.form("input_form"):
+    JST = timezone(timedelta(hours=+9), 'JST')
+    current_year = datetime.now(JST).year
+    min_date = datetime(current_year - 100, 1, 1).date()
+    max_date = datetime(current_year, 12, 31).date()
+    
+    if ENABLE_SYNASTRY:
+        st.markdown("##### 👤 Person 1 (Required)")
+        
     col1, col2 = st.columns(2)
     with col1:
         name_in = st.text_input("Name (e.g., Taro Yamada)", value="")
     with col2:
-        JST = timezone(timedelta(hours=+9), 'JST')
-        current_year = datetime.now(JST).year
-        min_date = datetime(current_year - 100, 1, 1).date()
-        max_date = datetime(current_year, 12, 31).date()
-        birth_date = st.date_input("Birthday", value=datetime(2000, 1, 1), min_value=min_date, max_value=max_date)
-        birth_in = birth_date.strftime("%Y%m%d")
+        birth_date = st.date_input("Birthday", value=datetime(2000, 1, 1), min_value=min_date, max_value=max_date, key="bd1")
+        
+    name2_in = ""
+    birth2_date = None
+    
+    if ENABLE_SYNASTRY:
+        st.markdown("##### 👥 Person 2 (Optional - For Synastry)")
+        col3, col4 = st.columns(2)
+        with col3:
+            name2_in = st.text_input("Name 2 (Optional)", value="")
+        with col4:
+            birth2_date = st.date_input("Birthday 2", value=datetime(2000, 1, 1), min_value=min_date, max_value=max_date, key="bd2")
     
     submitted = st.form_submit_button("Generate Dashboard")
 
 if submitted:
+    valid = True
     if not re.match(r'^[a-zA-Z\s]+$', name_in):
-        st.error("エラー: 氏名はローマ字（アルファベット）のみで入力してください。")
-    elif len(birth_in) != 8 or not birth_in.isdigit():
-        st.error("エラー: 生年月日は正しく入力してください。")
-    else:
+        st.error("エラー: 1人目の氏名はローマ字（アルファベット）のみで入力してください。")
+        valid = False
+        
+    if name2_in:
+        if not re.match(r'^[a-zA-Z\s]+$', name2_in):
+            st.error("エラー: 2人目の氏名もローマ字（アルファベット）のみで入力してください。")
+            valid = False
+            
+    if valid:
         st.session_state.show_dashboard = True
         st.session_state.ai_reading = None
 
 if st.session_state.show_dashboard:
+    birth_in = birth_date.strftime("%Y%m%d")
+    birth2_in = birth2_date.strftime("%Y%m%d") if name2_in else None
+    
     if len(birth_in) == 8 and birth_in.isdigit():
-        with st.spinner("Analyzing your numbers..."):
-            chart = NatalChart(name=name_in, birthdate=birth_in)
-            report_text = chart.generate_report_text()
-            res = chart.results
-            c = res["Counts"]
+        with st.spinner("Analyzing numbers..."):
+            chart1 = NatalChart(name=name_in, birthdate=birth_in)
+            chart2 = NatalChart(name=name2_in, birthdate=birth2_in) if name2_in else None
+            
+            report_text = chart1.generate_report_text()
+            if chart2:
+                report_text += "\n\n" + chart2.generate_report_text()
             
             with st.expander("Show Original Text Report Format", expanded=False):
                 st.code(report_text, language="text")
             
-            st.markdown('<div class="section-header">[ Core Numbers & Themes ]</div>', unsafe_allow_html=True)
-            
-            c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric("Birth Number", res["BirthNum"])
-            c2.metric("Destiny Number", res["DestinyNum"])
-            c3.metric("Soul Number", res["SoulNum"])
-            c4.metric("Personality Number", res["PersoNum"])
-            c5.metric("Realization Number", res["RealizNum"])
-            
-            st.write("") 
-            
-            c6, c7, c8, c9, c10 = st.columns(5)
-            c6.metric("Stage Number", res["StageNum"])
-            c7.metric("Challenge Number", res["ChallNum"])
-            c8.metric("New Strength", res["Strengths"])
-            c9.metric("Hidden Theme", res["SubTheme"])
-            c10.metric("Carmic Number", res["CarmicNum"])
+            if chart2:
+                tab1, tab2 = st.tabs([f"👤 {name_in.upper()}", f"👥 {name2_in.upper()}"])
+                with tab1:
+                    render_dashboard(chart1, chart2)
+                with tab2:
+                    render_dashboard(chart2, chart1)
+            else:
+                render_dashboard(chart1)
 
-            st.markdown('<div class="section-header">[ Turning Point Ages ]</div>', unsafe_allow_html=True)
-            c1, c2, c3 = st.columns(3)
-            c1.metric("1st Turning Point", f"{res['TP'][0]} yrs")
-            c2.metric("2nd Turning Point (Main)", f"{res['TP'][1]} yrs")
-            c3.metric("3rd Turning Point", f"{res['TP'][2]} yrs")
-
-            st.markdown('<div class="section-header">[ Life Cycle Stages ]</div>', unsafe_allow_html=True)
-            df_stages = pd.DataFrame(res["Stages"])
-            df_stages.columns = ["Term", "Age", "Milestone", "Rout", "Hardships"]
-            
-            styled_stages = df_stages.style.set_properties(**{'text-align': 'center'}) \
-                .set_table_styles([dict(selector='th', props=[('text-align', 'center')])]) \
-                .hide(axis="index")
-            st.table(styled_stages)
-            
-            st.markdown('<div class="section-header">[ Nine Box ]</div>', unsafe_allow_html=True)
-            
-            col_box, col_sums = st.columns([1, 1])
-            with col_box:
-                html_grid = f"""
-                <table style='width: 100%; max-width: 400px; text-align: center; border-collapse: separate; border-spacing: 8px;'>
-                  <tr>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[3]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[3]}</span>
-                    </td>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[6]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[6]}</span>
-                    </td>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[9]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[9]}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[2]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[2]}</span>
-                    </td>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[5]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[5]}</span>
-                    </td>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[8]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[8]}</span>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[1]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[1]}</span>
-                    </td>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[4]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[4]}</span>
-                    </td>
-                    <td style='border-radius: 10px; padding: 20px; background-color: var(--secondary-background-color); border: 1px solid var(--border-color); box-shadow: 1px 1px 4px rgba(0,0,0,0.05); color: inherit;'>
-                      <span style='opacity:0.7; font-size:14px; font-weight:bold;'>[7]</span><br><span style='font-size:28px; font-weight:bold; color: #4a90e2;'>{c[7]}</span>
-                    </td>
-                  </tr>
-                </table>
-                """
-                st.markdown(html_grid, unsafe_allow_html=True)
-                
-            with col_sums:
-                ma = res["MagicArray"]
-                nbs = res["NineBoxSums"]
-                max_val = res["NineBoxMax"] if res["NineBoxMax"] > 0 else 1
-                
-                sum_lines_data = [
-                    {"name": "3-6-9", "str": nbs[0], "num": ma[0]},
-                    {"name": "2-5-8", "str": nbs[1], "num": ma[1]},
-                    {"name": "1-4-7", "str": nbs[2], "num": ma[2]},
-                    {"name": "1-2-3", "str": nbs[3], "num": ma[3]},
-                    {"name": "4-5-6", "str": nbs[4], "num": ma[4]},
-                    {"name": "7-8-9", "str": nbs[5], "num": ma[5]},
-                    {"name": "3-5-7", "str": nbs[6], "num": ma[6]},
-                    {"name": "1-5-9", "str": nbs[7], "num": ma[7]}
-                ]
-                
-                sum_html = "<table style='width:100%; border-collapse: collapse; margin-top: 10px; color: inherit;'>"
-                sum_html += "<tr style='border-bottom: 2px solid var(--border-color);'><th style='padding:8px; text-align:center;'>Sum Lines</th><th style='padding:8px; text-align:center;'>Sum</th><th style='padding:8px; width:50%;'></th></tr>"
-                for s in sum_lines_data:
-                    bar_w = int((s["num"] / max_val) * 100) if s["str"] != "_" else 0
-                    # ★ 変更箇所：グラフが左から右へジワッと伸びるCSSアニメーション（expandBar）を付与
-                    bar = f"<div style='width:{bar_w}%; background-color:#4a90e2; height:12px; border-radius:3px; transform-origin: left; animation: expandBar 1.2s cubic-bezier(0.1, 0.7, 0.1, 1) both 0.5s;'></div>" if bar_w > 0 else ""
-                    sum_html += f"<tr><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center;'>{s['name']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center; font-weight:bold;'>{s['str']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color);'>{bar}</td></tr>"
-                sum_html += "</table>"
-                st.markdown(sum_html, unsafe_allow_html=True)
-
-            st.markdown('<div class="section-header">[ Year Cycle Table (Age 0 - 80) ]</div>', unsafe_allow_html=True)
-            
-            cycle_keywords = {
-                1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-                6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
-            }
-            
-            col_a, col_b, col_c = st.columns(3)
-            
-            def create_cycle_df(start_age, end_age):
-                data = []
-                for age in range(start_age, end_age):
-                    y = res["BirthYear"] + age
-                    cyc = chart._get_personal_year(y, res["BirthMonth"], res["BirthDay"])
-                    theme = cycle_keywords.get(cyc, "")
-                    data.append({"Age": age, "Year": y, "Cycle": cyc, "Theme": theme})
-                return pd.DataFrame(data)
-
-            def color_cycle(val):
-                colors = {
-                    1: '#ffe5e5', 2: '#fff2e5', 3: '#ffffe5', 
-                    4: '#e5ffe5', 5: '#e5ffff', 6: '#e5f2ff', 
-                    7: '#e5e5ff', 8: '#f2e5ff', 9: '#ffe5f2'
-                }
-                bg_color = colors.get(val, '')
-                return f'background-color: {bg_color}; color: #000000;' if bg_color else ''
-
-            def style_cycles(df):
-                return df.style.map(color_cycle, subset=['Cycle']) \
-                               .set_properties(**{'text-align': 'center'}) \
-                               .set_table_styles([dict(selector='th', props=[('text-align', 'center')])]) \
-                               .hide(axis="index")
-
-            with col_a: st.table(style_cycles(create_cycle_df(0, 27)))
-            with col_b: st.table(style_cycles(create_cycle_df(27, 54)))
-            with col_c: st.table(style_cycles(create_cycle_df(54, 81)))
-
-            # --- 4. Personalized Reading ---
             st.markdown('<div class="section-header">[ Personalized Reading ]</div>', unsafe_allow_html=True)
-            st.write("上記の結果に基づいたあなた専用のパーソナライズされた鑑定書を生成します。")
+            if chart2:
+                st.write("2名分のデータに基づいた相性診断（Synastry Reading）を含めた鑑定書を生成します。")
+            else:
+                st.write("上記の結果に基づいたあなた専用のパーソナライズされた鑑定書を生成します。")
 
             try:
                 api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
@@ -809,8 +973,9 @@ if st.session_state.show_dashboard:
                     JST = timezone(timedelta(hours=+9), 'JST')
                     current_time_str = datetime.now(JST).strftime("%Y年%m月%d日")
                         
+                    prompt_name = name_in if not chart2 else f"{name_in} & {name2_in}"
                     prompt = template_text.format(
-                        name=name_in, 
+                        name=prompt_name, 
                         full_report=report_text,
                         current_date=current_time_str
                     )
@@ -829,11 +994,14 @@ if st.session_state.show_dashboard:
                                     if not line:
                                         temp_html += "<div style='height: 12px;'></div>"
                                         continue
-                                    if line.startswith('#'):
-                                        title_text = line.lstrip('#').strip()
+                                    
+                                    safe_line = line.replace("<", "&lt;").replace(">", "&gt;")
+                                    
+                                    if safe_line.startswith('#'):
+                                        title_text = safe_line.lstrip('#').strip()
                                         temp_html += f"<div style='color: #4a90e2; font-size: 1.3em; font-weight: 600; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;'>{title_text}</div>"
                                     else:
-                                        temp_html += f"<div style='margin-bottom: 8px;'>{line}</div>"
+                                        temp_html += f"<div style='margin-bottom: 8px;'>{safe_line}</div>"
                                 placeholder.markdown(f"""<div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">{temp_html}</div>""", unsafe_allow_html=True)
                                 
                             st.session_state.ai_reading = full_text
@@ -858,21 +1026,33 @@ if st.session_state.show_dashboard:
                     if not line:
                         formatted_html += "<div style='height: 12px;'></div>"
                         continue
-                    if line.startswith('#'):
-                        title_text = line.lstrip('#').strip()
+                        
+                    safe_line = line.replace("<", "&lt;").replace(">", "&gt;")
+                    
+                    if safe_line.startswith('#'):
+                        title_text = safe_line.lstrip('#').strip()
                         formatted_html += f"<div style='color: #4a90e2; font-size: 1.3em; font-weight: 600; margin-top: 30px; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;'>{title_text}</div>"
                     else:
-                        formatted_html += f"<div style='margin-bottom: 8px;'>{line}</div>"
+                        formatted_html += f"<div style='margin-bottom: 8px;'>{safe_line}</div>"
                 st.markdown(f"""<div style="background-color: var(--secondary-background-color); border: 1px solid var(--border-color); padding: 30px; border-radius: 10px; box-shadow: 2px 2px 8px rgba(0,0,0,0.05); text-align: left; line-height: 1.8;">{formatted_html}</div>""", unsafe_allow_html=True)
 
             # --- PDF Export セクション ---
             st.markdown('<div class="section-header">[ Export Report ]</div>', unsafe_allow_html=True)
             if HAS_FPDF:
-                pdf_filename = f"{name_in.replace(' ', '_')}_Graphical.pdf"
+                pdf_filename = f"{name_in.replace(' ', '_')}_Premium_Report.pdf" if not chart2 else "Synastry_Premium_Report.pdf"
                 ai_text = st.session_state.get("ai_reading", None)
-                chart.export_graphical_pdf(pdf_filename, ai_text=ai_text)
+                
+                pdf = FPDF()
+                if chart2:
+                    chart1.export_graphical_pdf(pdf=pdf)
+                    chart2.export_graphical_pdf(pdf=pdf, ai_text=ai_text)
+                else:
+                    chart1.export_graphical_pdf(pdf=pdf, ai_text=ai_text)
+                    
+                pdf.output(pdf_filename)
+                
                 with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button(label="Download Full Graphical PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
+                    st.download_button(label="Download Premium PDF Report", data=pdf_file, file_name=pdf_filename, mime="application/pdf", use_container_width=True)
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
