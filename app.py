@@ -15,19 +15,17 @@ except ImportError:
     HAS_FPDF = False
 
 # ==========================================
-# 1. API呼び出し関数（ストリーミング対応版に変更）
+# 1. API呼び出し関数（ストリーミング対応版）
 # ==========================================
 def get_gemini_reading_stream(api_key, model, prompt):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
     
-    # ★maxOutputTokens を最大化（8192）に明示的に設定
     data = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 8192} 
     }
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'})
     
-    # ★タイムアウトを長くし、分割されたデータを確実につなぎ合わせる安全な処理
     with urllib.request.urlopen(req, timeout=180) as response:
         buffer = ""
         for line in response:
@@ -37,19 +35,16 @@ def get_gemini_reading_stream(api_key, model, prompt):
                 if data_str == "[DONE]":
                     break
                 
-                # データをバッファに溜める
                 buffer += data_str
                 try:
-                    # バッファが完全なJSONデータになった時だけ読み込む
                     chunk_json = json.loads(buffer)
                     if "candidates" in chunk_json and len(chunk_json["candidates"]) > 0:
                         parts = chunk_json["candidates"][0].get("content", {}).get("parts", [])
                         if parts:
                             chunk_text = parts[0].get("text", "")
                             yield chunk_text.replace('*', '')
-                    buffer = ""  # 成功したらバッファを空にする
+                    buffer = ""  
                 except json.JSONDecodeError:
-                    # JSONが途切れている場合はエラーを出さず、次の行が来るのを待つ
                     pass
 
 # ==========================================
@@ -83,16 +78,12 @@ class NatalChart:
     def _calculate(self):
         b_year, b_month, b_day = int(self.birthdate[:4]), int(self.birthdate[4:6]), int(self.birthdate[6:8])
         
-        # VBA Ver.6.r.0 '- 2026.04.26 (2)' ロジックに準拠
-        y_raw = sum(int(d) for d in str(b_year))      # 年の各桁の和
-        m_raw = (b_month // 10) + (b_month % 10)      # 月の各桁の和
-        d_raw = (b_day // 10) + (b_day % 10)          # 日の各桁の和
+        y_raw = sum(int(d) for d in str(b_year))
+        m_raw = (b_month // 10) + (b_month % 10)
+        d_raw = (b_day // 10) + (b_day % 10)
 
-        # ★ Carmic Number の算出
-        carmic1 = y_raw + m_raw + d_raw               # 全桁の単純合算
-        
-        def vba_reduce_once(n):
-            return (n // 10) + (n % 10)
+        carmic1 = y_raw + m_raw + d_raw
+        def vba_reduce_once(n): return (n // 10) + (n % 10)
         carmic2 = vba_reduce_once(y_raw) + vba_reduce_once(m_raw) + vba_reduce_once(d_raw)
         
         a0 = b_year + b_month + b_day
@@ -100,11 +91,9 @@ class NatalChart:
         
         carmic_0 = 0
         for c in (carmic1, carmic2, carmic3):
-            if c in (13, 14, 16, 19):
-                carmic_0 = c
+            if c in (13, 14, 16, 19): carmic_0 = c
         carmic_str = str(carmic_0) if carmic_0 != 0 else "-"
 
-        # ★ Birth Number のマスターナンバー判定
         raw_birth = y_raw + m_raw + d_raw
         display_birth_num = self._reduce_to_single(raw_birth)
         temp_val = raw_birth
@@ -114,7 +103,6 @@ class NatalChart:
                 break
             temp_val = sum(int(digit) for digit in str(temp_val))
 
-        # 以降の計算用（1桁還元）
         y_num = self._reduce_to_single(y_raw)
         m_num = self._reduce_to_single(b_month)
         d_num = self._reduce_to_single(b_day)
@@ -524,12 +512,9 @@ class NatalChart:
 # ==========================================
 st.set_page_config(page_title="Natal Chart Dashboard", layout="wide")
 
-# =========================================================================
-# ★【完全決着】WebViewエラー要因を一切含まない、もっとも強力で安全なCSS
-# =========================================================================
 st.markdown("""
 <style>
-/* 1. 標準のヘッダー・フッター・メニューを確実に隠す */
+/* ヘッダー・フッター・メニュー・クラウド特有ボタンの非表示処理 */
 header { visibility: hidden !important; display: none !important; }
 footer { visibility: hidden !important; display: none !important; }
 #MainMenu { visibility: hidden !important; display: none !important; }
@@ -537,41 +522,24 @@ footer { visibility: hidden !important; display: none !important; }
 .stApp > footer { display: none !important; }
 [data-testid="stHeader"] { display: none !important; }
 [data-testid="stFooter"] { display: none !important; }
-
-/* 2. クラウド特有の赤・緑のフローティングボタンをクラス名や属性で完全非表示 */
 .stDeployButton { display: none !important; }
 [data-testid="manage-app-button"] { display: none !important; }
-[class^="viewerBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
-[class*="viewerBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
-[class^="manageAppBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
-[class*="manageAppBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
-
-/* 3. 画面下部に固定される要素（グレーの帯やBuilt with等の親枠）を座標から狙い撃ちして強制消去 */
+[class^="viewerBadge"], [class*="viewerBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
+[class^="manageAppBadge"], [class*="manageAppBadge"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
 div[style*="position: fixed"][style*="bottom"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
 div[style*="position: absolute"][style*="bottom"] { display: none !important; opacity: 0 !important; z-index: -9999 !important; pointer-events: none !important; }
-
-/* 4. Streamlitへのリンク文字（Built with Streamlit等）とFullscreenボタンを隠す */
 a[href*="streamlit.io"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
-a[title="Fullscreen"] { display: none !important; }
-svg[title="Fullscreen"] { display: none !important; }
-button[title="Fullscreen"] { display: none !important; }
-[data-testid="stBottom"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
-[data-testid="stEmbedFooter"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
-
-/* 5. 画面下部の無駄な余白を完全に詰める */
+a[title="Fullscreen"], svg[title="Fullscreen"], button[title="Fullscreen"] { display: none !important; }
+[data-testid="stBottom"], [data-testid="stEmbedFooter"] { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
 .block-container { padding-bottom: 1rem !important; margin-bottom: 0rem !important; }
 
-/* --- 6. ★ Privacy PolicyボタンをNavigated by Nabiと全く同じ文字サイズ・色・フォントにする --- */
 button[kind="tertiary"], button[kind="tertiary"] p {
     color: gray !important;
     font-size: 12px !important;
     font-weight: normal !important;
     font-family: inherit !important;
 }
-button[kind="tertiary"]:hover p {
-    text-decoration: underline !important;
-}
-/* ========================================================================= */
+button[kind="tertiary"]:hover p { text-decoration: underline !important; }
 
 div[data-testid="metric-container"] {
     background-color: var(--secondary-background-color);
@@ -604,15 +572,39 @@ div[data-testid="metric-container"]:hover {
 table th, table td {
     text-align: center !important;
 }
+
+/* ========================================================================= */
+/* ★ 拡張機能：結果画面のフェードイン＆グラフ伸長アニメーション ★ */
+/* ========================================================================= */
+@keyframes fadeInUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes expandBar {
+    0% { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+
+/* 見出し、数字パネル、テーブル全体に下からフワッと浮き上がる効果を付与 */
+.section-header {
+    animation: fadeInUp 0.7s ease-out both;
+}
+div[data-testid="metric-container"] {
+    animation: fadeInUp 0.7s ease-out both 0.15s;
+}
+div[data-testid="stTable"] {
+    animation: fadeInUp 0.7s ease-out both 0.3s;
+}
+table {
+    animation: fadeInUp 0.7s ease-out both 0.2s;
+}
+/* ========================================================================= */
 </style>
 """, unsafe_allow_html=True)
-# =========================================================================
 
-# ★ プライバシーポリシーをフワッと表示するダイアログ（ポップアップ）機能
 @st.dialog("Privacy Policy")
 def show_privacy_policy():
     try:
-        # app.py と同じフォルダにある privacy_policy.txt を読み込む
         with open("privacy_policy.txt", "r", encoding="utf-8") as f:
             policy_text = f.read()
         st.markdown(policy_text)
@@ -629,15 +621,12 @@ if "show_dashboard" not in st.session_state:
 with st.form("input_form"):
     col1, col2 = st.columns(2)
     with col1:
-        # ★ 変更箇所：初期値（ご自身のお名前等）を空欄にし、汎用的なプレースホルダーに変更
         name_in = st.text_input("Name (e.g., Taro Yamada)", value="")
     with col2:
         JST = timezone(timedelta(hours=+9), 'JST')
         current_year = datetime.now(JST).year
         min_date = datetime(current_year - 100, 1, 1).date()
         max_date = datetime(current_year, 12, 31).date()
-            
-        # ★ 変更箇所：初期選択日を汎用的な日付（2000/1/1）に変更
         birth_date = st.date_input("Birthday", value=datetime(2000, 1, 1), min_value=min_date, max_value=max_date)
         birth_in = birth_date.strftime("%Y%m%d")
     
@@ -759,7 +748,8 @@ if st.session_state.show_dashboard:
                 sum_html += "<tr style='border-bottom: 2px solid var(--border-color);'><th style='padding:8px; text-align:center;'>Sum Lines</th><th style='padding:8px; text-align:center;'>Sum</th><th style='padding:8px; width:50%;'></th></tr>"
                 for s in sum_lines_data:
                     bar_w = int((s["num"] / max_val) * 100) if s["str"] != "_" else 0
-                    bar = f"<div style='width:{bar_w}%; background-color:#4a90e2; height:12px; border-radius:3px;'></div>" if bar_w > 0 else ""
+                    # ★ 変更箇所：グラフが左から右へジワッと伸びるCSSアニメーション（expandBar）を付与
+                    bar = f"<div style='width:{bar_w}%; background-color:#4a90e2; height:12px; border-radius:3px; transform-origin: left; animation: expandBar 1.2s cubic-bezier(0.1, 0.7, 0.1, 1) both 0.5s;'></div>" if bar_w > 0 else ""
                     sum_html += f"<tr><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center;'>{s['name']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color); text-align:center; font-weight:bold;'>{s['str']}</td><td style='padding:8px; border-bottom:1px solid var(--border-color);'>{bar}</td></tr>"
                 sum_html += "</table>"
                 st.markdown(sum_html, unsafe_allow_html=True)
@@ -886,7 +876,6 @@ if st.session_state.show_dashboard:
                 os.remove(pdf_filename)
             else: st.warning("PDFライブラリが不足しています。")
 
-# ★ プライバシーポリシーのダイアログ（ポップアップ）表示
 st.markdown("""
 <div style="text-align: center; color: gray; font-size: 12px; margin-top: 50px; margin-bottom: 10px;">
     Navigated by Nabi
