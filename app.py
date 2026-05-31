@@ -15,6 +15,12 @@ except ImportError:
     HAS_FPDF = False
 
 # ==========================================
+# ★ アプリバージョン設定 ★
+# （アップデートの際はこの文字列を変更してください）
+# ==========================================
+APP_VERSION = "v7r0"
+
+# ==========================================
 # ★設定ファイル（コントロールファイル）の読み込み
 # ==========================================
 def load_settings():
@@ -245,15 +251,14 @@ class NatalChart:
         lines.append("-" * 75)
         lines.append(" [ Cycle 1-9 Status ]")
         lines.append("  1: Beginning   2: Alignment   3: Creation   4: Stability   5: Movement")
-        lines.append("  6: Love        7: Reflection    8: Enrichment  9: Completion")
+        lines.append("  6: Love        7: Self-Reflection    8: Enrichment  9: Completion")
         lines.append("-" * 75)
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-            6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
+            6: "Love", 7: "Self-Reflection", 8: "Enrichment", 9: "Completion"
         }
         
-        # 105歳対応のテキストレポート出力 (35年×3列)
         lines.append(" [ Year Cycle Table ]")
         lines.append("  Age | Year | Cyc Theme    || Age | Year | Cyc Theme    || Age | Year | Cyc Theme")
         lines.append("  " + "-" * 81)
@@ -464,14 +469,13 @@ class NatalChart:
             pdf.cell(20, 6, str(s_val), border=1, new_x="LMARGIN", new_y="NEXT", align="C", fill=fill_clr)
             pdf.set_font("Helvetica", "", 9)
 
-        # --- Page 2: Year Cycle (105歳対応 / 35年×3列) ---
         pdf.add_page()
         pdf.set_draw_color(*BORDER_GREY)
         draw_section_header("YEAR CYCLE TABLE (Age 0 - 104)")
         
         cycle_keywords = {
             1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-            6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
+            6: "Love", 7: "Self-Reflection", 8: "Enrichment", 9: "Completion"
         }
 
         def get_cycle_rgb(cycle):
@@ -482,7 +486,6 @@ class NatalChart:
             }
             return mapping.get(cycle, (255, 255, 255))
 
-        # 元の美しい3列幅設定を復元
         col_w_age = 8
         col_w_year = 12
         col_w_cyc = 6
@@ -506,7 +509,6 @@ class NatalChart:
 
         pdf.set_text_color(*TEXT_GREY)
         pdf.set_font("Helvetica", "", 8)
-        # 35行で出力
         for r in range(35):
             pdf.set_x(start_x)
             for c_idx in range(3):
@@ -764,10 +766,9 @@ def render_dashboard(chart1, chart2=None):
     
     cycle_keywords = {
         1: "Beginning", 2: "Alignment", 3: "Creation", 4: "Stability", 5: "Movement",
-        6: "Love", 7: "Reflection", 8: "Enrichment", 9: "Completion"
+        6: "Love", 7: "Self-Reflection", 8: "Enrichment", 9: "Completion"
     }
     
-    # 3列のレイアウトに戻し、1列を35年に変更 (35年 × 3列 = 105歳まで)
     col_a, col_b, col_c = st.columns(3)
     
     def create_cycle_df(start_age, end_age):
@@ -874,6 +875,9 @@ def show_privacy_policy():
         st.markdown(policy_text)
     except FileNotFoundError:
         st.error("プライバシーポリシーのファイルが見つかりません。")
+
+# ★ バージョンを目立たず右上に表示
+st.markdown(f"<div style='text-align: right; color: #a0a0a0; font-size: 12px;'>{APP_VERSION}</div>", unsafe_allow_html=True)
 
 st.title("Natal Chart Dashboard")
 
